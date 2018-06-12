@@ -1,49 +1,49 @@
 /**
  * Created by ashish on 02/05/18.
  */
-const Boom = require("boom");
-const _ = require("lodash");
-const {ObjectID} = require("mongodb");
-const AbstractAdapter = require("./abstract");
+const Boom = require('boom');
+const _ = require('lodash');
+const {ObjectID} = require('mongodb');
+const AbstractAdapter = require('./abstract');
 
 class Adapter extends AbstractAdapter {
   /**
    * @return {string}
    */
   static get DATABASE() {
-    return "";
+    return '';
   }
 
   /**
-   * @returns {{}}
+   * @return {{}}
    */
   static get SERIALIZED() {
     return {};
   }
 
   /**
-   * @returns {string}
+   * @return {string}
    */
   static get PLURAL() {
-    return "";
+    return '';
   }
 
   /**
-   * @returns {string}
+   * @return {string}
    */
   static get TABLE() {
-    return "";
+    return '';
   }
 
   /**
-   * @returns {Array}
+   * @return {Array}
    */
   static get FIELDS() {
     return [];
   }
 
   /**
-   * @returns {Array}
+   * @return {Array}
    */
   static get LINKS() {
     return [];
@@ -78,87 +78,97 @@ class Adapter extends AbstractAdapter {
   /**
    *
    * @param conditions
-   * @returns {*}
+   * @return {*}
    */
   conditionBuilder(conditions) {
-    let where = "",
-      args = [],
-      opr,
+    let opr,
       condition,
-      placeHolder,
-      addToArgs,
       temp,
-      isFirst = true,
-      sampleCondition = {
-        "field": "",
-        "operator": "=",
-        "value": "",
-        "condition": "AND"
-      },
-      operators = {
-        "=": "$eq",
-        "<": "$lt",
-        ">": "$gt",
-        "<=": "$lte",
-        ">=": "$gte",
-        "<>": "$ne",
-        "!=": "$ne",
-        // "like": ,
-        // "not like",
-        // "between",
-        // "ilike",
-        "regexp": "$regex",
-        "in": "$in",
-        "not in": "$nin"
-      };
+      isFirst,
+      sampleCondition,
+      operators,
+      compiled,
+      where;
+    isFirst = true;
+    sampleCondition = {
+      field: '',
+      operator: '=',
+      value: '',
+      condition: '$and'
+    };
+    operators = {
+      '=': '$eq',
+      '<': '$lt',
+      '>': '$gt',
+      '<=': '$lte',
+      '>=': '$gte',
+      '<>': '$ne',
+      '!=': '$ne',
+      // 'like': ,
+      // 'not like',
+      // 'ilike',
+      'regexp': '$regex',
+      'between': 'between',
+      'in': '$in',
+      'not in': '$nin'
+    };
 
-    let compiled = {};
+    compiled = {};
+
     _.forEach(conditions, (cond, key) => {
-      //for key-value pairs
-      if (typeof cond !== "object" || cond === null) {
+      // for key-value pairs
+      if (typeof cond !== 'object' || cond === null) {
         temp = cond;
         cond = _.clone(sampleCondition);
         cond.field = key;
         cond.value = temp;
       }
 
-      //Operator
-      opr = "=";
+      // Operator
+      opr = '=';
       if (cond.operator && operators[cond.operator]) {
         opr = cond.operator;
       }
       opr = operators[opr];
-      //condition
-      condition = "AND";
+      // condition
+      condition = '$and';
       if (cond.condition && !_.isEmpty(cond.condition)) {
-        condition = cond.condition;
+        condition = cond.condition.toLocaleLowerCase() === 'or' ? '$or' : '$and';
       }
 
-      let where = {};
-      where[cond.field] = {};
-      switch(opr) {
-      //   case "$in":
-      //   case "$nin":
-        case "$eq":
+      where = {[cond.field]: {}};
+      switch (opr) {
+        case 'between':
+          where[cond.field] = {
+            '$gte': cond.value[0],
+            '$lte': cond.value[1]
+          };
+          break;
+        case '$regex':
+          where[cond.field] = {
+            [opr]: new RegExp(cond.value)
+          };
+          break;
+        case '$eq':
           where[cond.field] = cond.value;
           break;
+        case '$in':
+        case '$nin':
+          if (!Array.isArray(cond.value)) {
+            cond.value = [cond.value];
+          }
+          // falls through
         default:
           where[cond.field][opr] = cond.value;
       }
-      switch(condition) {
-        case 'OR':
-          if (!compiled['$or']) {
-            compiled['$or'] = [];
-          }
-          compiled['$or'].push(where);
-          break;
-        case 'AND':
-          if (!compiled['$and']) {
-            compiled['$and'] = [];
-          }
-          compiled['$and'].push(where);
-          break;
+      if (isFirst === true) {
+        compiled = where;
+      } else {
+        compiled = {
+          [condition]: [where, compiled]
+        };
       }
+      isFirst = false;
     });
     return compiled;
   }
@@ -170,40 +180,39 @@ class Adapter extends AbstractAdapter {
    * @param order
    * @param from
    * @param limit
-   * @returns {*|promise}
+   * @return {*|promise}
    */
   SELECT(condition, select, order, from, limit) {
-    throw Boom.badImplementation("[adapter] `SELECT` method not implemented");
+    throw Boom.badImplementation('[adapter] `SELECT` method not implemented');
   }
 
   /**
    *
    * @param values
-   * @returns {*|promise}
+   * @return {*|promise}
    */
   INSERT(values) {
-    throw Boom.badImplementation("[adapter] `INSERT` method not implemented");
+    throw Boom.badImplementation('[adapter] `INSERT` method not implemented');
   }
 
   /**
    *
    * @param changes
    * @param condition
-   * @returns {*|promise}
+   * @return {*|promise}
    */
   UPDATE(changes, condition) {
-    throw Boom.badImplementation("[adapter] `UPDATE` method not implemented");
+    throw Boom.badImplementation('[adapter] `UPDATE` method not implemented');
   }
 
   /**
    *
    * @param condition
-   * @returns {*|promise}
+   * @return {*|promise}
    */
   DELETE(condition) {
-    throw Boom.badImplementation("[adapter] `DELETE` method not implemented");
+    throw Boom.badImplementation('[adapter] `DELETE` method not implemented');
   }
-
 }
 
 module.exports = Adapter;

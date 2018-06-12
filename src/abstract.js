@@ -2,6 +2,7 @@
  * Created by ashish on 27/4/17.
  */
 const Boom = require('boom');
+
 let connection;
 
 class AbstractAdapter {
@@ -9,7 +10,7 @@ class AbstractAdapter {
     this.properties = {};
     this.original = {};
     if (entity) {
-      this.constructor.FIELDS.forEach(field => {
+      this.constructor.FIELDS.forEach((field) => {
         if (entity[field]) {
           this.properties[field] = entity[field];
         }
@@ -19,7 +20,7 @@ class AbstractAdapter {
 
   /**
    *
-   * @returns {number}
+   * @return {number}
    * @constructor
    */
   static get PAGESIZE() {
@@ -39,7 +40,7 @@ class AbstractAdapter {
 
   /**
    *
-   * @returns {*}
+   * @return {*}
    */
   static get CONN() {
     return connection;
@@ -63,8 +64,8 @@ class AbstractAdapter {
   getChanges() {
     let changes;
     changes = {};
-    this.constructor.FIELDS.forEach(field => {
-      let currentValue = this.get(field);
+    this.constructor.FIELDS.forEach((field) => {
+      const currentValue = this.get(field);
       if (currentValue && currentValue !== this.original.get(field)) {
         changes[field] = currentValue;
       }
@@ -110,7 +111,7 @@ class AbstractAdapter {
 
   /**
    *
-   * @returns {string}
+   * @return {string}
    */
   getTableName() {
     throw Boom.badImplementation('[adapter] `getTableName` method not implemented');
@@ -123,7 +124,7 @@ class AbstractAdapter {
    * @param order
    * @param from
    * @param limit
-   * @returns {*|promise}
+   * @return {*|promise}
    */
   SELECT(condition, select, order, from, limit) {
     throw Boom.badImplementation('[adapter] `SELECT` method not implemented');
@@ -132,7 +133,7 @@ class AbstractAdapter {
   /**
    *
    * @param values
-   * @returns {*|promise}
+   * @return {*|promise}
    */
   INSERT(values) {
     throw Boom.badImplementation('[adapter] `INSERT` method not implemented');
@@ -142,7 +143,7 @@ class AbstractAdapter {
    *
    * @param changes
    * @param condition
-   * @returns {*|promise}
+   * @return {*|promise}
    */
   UPDATE(changes, condition) {
     throw Boom.badImplementation('[adapter] `UPDATE` method not implemented');
@@ -151,7 +152,7 @@ class AbstractAdapter {
   /**
    *
    * @param condition
-   * @returns {*|promise}
+   * @return {*|promise}
    */
   DELETE(condition) {
     throw Boom.badImplementation('[adapter] `DELETE` method not implemented');
@@ -162,7 +163,7 @@ class AbstractAdapter {
    * @param entity
    * @param conditions
    * @param fields
-   * @returns {Promise.<TResult>}
+   * @return {Promise.<TResult>}
    * @constructor
    */
   FINDLINKS(entity, conditions, fields) {
@@ -173,7 +174,7 @@ class AbstractAdapter {
    *
    * @param entity
    * @param conditions
-   * @returns {Promise.<TResult>}
+   * @return {Promise.<TResult>}
    * @constructor
    */
   DELETELINK(entity, conditions) {
@@ -184,7 +185,7 @@ class AbstractAdapter {
    *
    * @param entity
    * @param record
-   * @returns {Promise.<TResult>}
+   * @return {Promise.<TResult>}
    * @constructor
    */
   SAVELINK(entity, record) {
