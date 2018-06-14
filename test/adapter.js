@@ -172,11 +172,8 @@ describe('adapter', () => {
     });
 
     conditions.forEach((condition) => {
-      it(`should build - ${condition.output.where}`, (done) => {
-        console.log(JSON.stringify(mongo.conditionBuilder(condition.input)));
+      it(`should build - ${JSON.stringify(condition.output)}`, () => {
         mongo.conditionBuilder(condition.input).should.be.deep.eql(condition.output);
-
-        done();
       });
     });
   });

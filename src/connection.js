@@ -8,7 +8,10 @@ class Connection extends AbstractConnection {
   openConnection() {
     if (!this.connection) {
       return MongoClient.connect(this.config.url)
-        .then((client) => client.db(this.config.db));
+        .then((client) => {
+          this.connection = client.db(this.config.db);
+          return this.connection;
+        });
     }
     return Promise.resolve(this.connection);
   }
