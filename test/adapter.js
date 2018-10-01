@@ -7,10 +7,9 @@ chai.should();
 
 describe('adapter', () => {
   describe('conditionBuilder', () => {
-    let mongo,
-      conditions;
+    let mongo;
     mongo = null;
-    conditions = [
+    const conditions = [
       {
         input: {
           a: 1,
@@ -18,42 +17,42 @@ describe('adapter', () => {
           c: {
             field: 'c',
             operator: 'in',
-            value: [3, '4', 'x']
-          }
+            value: [3, '4', 'x'],
+          },
         },
         output: {
           $and: [
-            {c: {$in: [3, '4', 'x']}},
+            { c: { $in: [3, '4', 'x'] } },
             {
               $and: [
-                {b: 2},
-                {a: 1}
-              ]
-            }
-          ]
-        }
+                { b: 2 },
+                { a: 1 },
+              ],
+            },
+          ],
+        },
       },
       {
         input: {
-          'a': 1,
+          a: 1,
           'b.c': 2,
-          'c': {
+          c: {
             field: 'c.d',
             operator: 'in',
-            value: [3, '4', 'x']
-          }
+            value: [3, '4', 'x'],
+          },
         },
         output: {
           $and: [
-            {'c.d': {$in: [3, '4', 'x']}},
+            { 'c.d': { $in: [3, '4', 'x'] } },
             {
               $and: [
-                {'b.c': 2},
-                {a: 1}
-              ]
-            }
-          ]
-        }
+                { 'b.c': 2 },
+                { a: 1 },
+              ],
+            },
+          ],
+        },
       },
       {
         input: {
@@ -62,20 +61,20 @@ describe('adapter', () => {
           c: {
             field: 'c',
             operator: 'in',
-            value: 'a'
-          }
+            value: 'a',
+          },
         },
         output: {
           $and: [
-            {'c': {'$in': ['a']}},
+            { c: { $in: ['a'] } },
             {
               $and: [
-                {b: 2},
-                {a: 1}
-              ]
-            }
-          ]
-        }
+                { b: 2 },
+                { a: 1 },
+              ],
+            },
+          ],
+        },
       },
       {
         input: {
@@ -84,87 +83,87 @@ describe('adapter', () => {
           c: {
             field: 'c',
             operator: 'not in',
-            value: 'a'
-          }
+            value: 'a',
+          },
         },
         output: {
           $and: [
-            {'c': {'$nin': ['a']}},
+            { c: { $nin: ['a'] } },
             {
               $and: [
-                {b: 2},
-                {a: 1}
-              ]
-            }
-          ]
-        }
+                { b: 2 },
+                { a: 1 },
+              ],
+            },
+          ],
+        },
       },
       {
         input: [
           {
             field: 'a',
-            value: 1
+            value: 1,
           },
           {
             field: 'b',
             operator: '!=',
             value: '2',
-            condition: 'OR'
-          }
+            condition: 'OR',
+          },
         ],
         output: {
-          '$or': [
-            {b: {'$ne': '2'}},
-            {a: 1}
-          ]
-        }
+          $or: [
+            { b: { $ne: '2' } },
+            { a: 1 },
+          ],
+        },
       },
       {
         input: [
           {
             field: 'c',
             operator: '=',
-            value: null
+            value: null,
           },
           {
             field: 'd',
             operator: '!=',
             value: null,
-            condition: 'AND'
-          }
+            condition: 'AND',
+          },
         ],
         output: {
-          '$and': [
-            {'d': {'$ne': null}},
-            {'c': null}
-          ]
-        }
+          $and: [
+            { d: { $ne: null } },
+            { c: null },
+          ],
+        },
       },
       {
         input: [
           {
             field: 'x',
             operator: 'between',
-            value: [10, 20]
+            value: [10, 20],
           },
           {
             field: 'y',
             operator: 'regexp',
             value: '/find/',
-            condition: 'OR'
-          }
+            condition: 'OR',
+          },
         ],
         output: {
-          '$or': [
-            {'y': {'$regex': new RegExp('/find/')}},
-            {'x': {'$gte': 10, '$lte': 20}}
-          ]
-        }
+          $or: [
+            { y: { $regex: new RegExp('/find/') } },
+            { x: { $gte: 10, $lte: 20 } },
+          ],
+        },
       },
       {
         input: null,
-        output: {}
-      }
+        output: {},
+      },
     ];
 
     beforeEach(() => {

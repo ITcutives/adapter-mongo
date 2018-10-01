@@ -1,10 +1,14 @@
 /**
  * Created by ashish on 02/05/18.
  */
-const MongoClient = require('mongodb').MongoClient;
+const { MongoClient } = require('mongodb');
 const AbstractConnection = require('./abstractConnection');
 
 class Connection extends AbstractConnection {
+  static get TYPE() {
+    return 'MONGO';
+  }
+
   openConnection() {
     if (!this.connection) {
       return MongoClient.connect(this.config.url)
@@ -21,7 +25,10 @@ class Connection extends AbstractConnection {
     if (!conn) {
       return Promise.resolve();
     }
-    return conn.close().then(() => (this.connection = undefined));
+    return conn.close()
+      .then(() => {
+        this.connection = undefined;
+      });
   }
 }
 

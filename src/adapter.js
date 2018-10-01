@@ -1,11 +1,12 @@
+/* eslint-disable no-param-reassign,no-unused-vars,class-methods-use-this */
 /**
  * Created by ashish on 02/05/18.
  */
 const Boom = require('boom');
-const _forEach = require('lodash/forEach');
-const _isEmpty = require('lodash/isEmpty');
-const _clone = require('lodash/clone');
-const {ObjectID} = require('mongodb');
+const loForEach = require('lodash/forEach');
+const loIsEmpty = require('lodash/isEmpty');
+const loClone = require('lodash/clone');
+const { ObjectID } = require('mongodb');
 const AbstractAdapter = require('./abstract');
 
 class Adapter extends AbstractAdapter {
@@ -54,7 +55,7 @@ class Adapter extends AbstractAdapter {
   constructor(entity) {
     super();
     if (entity) {
-      _forEach(entity, (v, field) => {
+      loForEach(entity, (v, field) => {
         if (this.constructor.FIELDS.indexOf(field) !== -1) {
           this.properties[field] = v;
         }
@@ -70,7 +71,7 @@ class Adapter extends AbstractAdapter {
     return Promise.resolve(this);
   }
 
-  convertKey(id) {
+  static convertKey(id) {
     if (typeof id === 'string' && id.length === 24) {
       return new ObjectID(id);
     }
@@ -83,22 +84,21 @@ class Adapter extends AbstractAdapter {
    * @return {*}
    */
   conditionBuilder(conditions) {
-    let opr,
-      condition,
-      temp,
-      isFirst,
-      sampleCondition,
-      operators,
-      compiled,
-      where;
+    let opr;
+    let condition;
+    let temp;
+    let isFirst;
+    let compiled;
+    let where;
+
     isFirst = true;
-    sampleCondition = {
+    const sampleCondition = {
       field: '',
       operator: '=',
       value: '',
-      condition: '$and'
+      condition: '$and',
     };
-    operators = {
+    const operators = {
       '=': '$eq',
       '<': '$lt',
       '>': '$gt',
@@ -109,19 +109,19 @@ class Adapter extends AbstractAdapter {
       // 'like': ,
       // 'not like',
       // 'ilike',
-      'regexp': '$regex',
-      'between': 'between',
-      'in': '$in',
-      'not in': '$nin'
+      regexp: '$regex',
+      between: 'between',
+      in: '$in',
+      'not in': '$nin',
     };
 
     compiled = {};
 
-    _forEach(conditions, (cond, key) => {
+    loForEach(conditions, (cond, key) => {
       // for key-value pairs
       if (typeof cond !== 'object' || cond === null) {
         temp = cond;
-        cond = _clone(sampleCondition);
+        cond = loClone(sampleCondition);
         cond.field = key;
         cond.value = temp;
       }
@@ -134,21 +134,21 @@ class Adapter extends AbstractAdapter {
       opr = operators[opr];
       // condition
       condition = '$and';
-      if (cond.condition && !_isEmpty(cond.condition)) {
+      if (cond.condition && !loIsEmpty(cond.condition)) {
         condition = cond.condition.toLocaleLowerCase() === 'or' ? '$or' : '$and';
       }
 
-      where = {[cond.field]: {}};
+      where = { [cond.field]: {} };
       switch (opr) {
         case 'between':
           where[cond.field] = {
-            '$gte': cond.value[0],
-            '$lte': cond.value[1]
+            $gte: cond.value[0],
+            $lte: cond.value[1],
           };
           break;
         case '$regex':
           where[cond.field] = {
-            [opr]: new RegExp(cond.value)
+            [opr]: new RegExp(cond.value),
           };
           break;
         case '$eq':
@@ -167,7 +167,7 @@ class Adapter extends AbstractAdapter {
         compiled = where;
       } else {
         compiled = {
-          [condition]: [where, compiled]
+          [condition]: [where, compiled],
         };
       }
       isFirst = false;
@@ -193,16 +193,13 @@ class Adapter extends AbstractAdapter {
    * @return {*|promise}
    */
   async INSERT(values) {
-    let table,
-      connection;
-
-    if (_isEmpty(this.properties)) {
+    if (loIsEmpty(this.properties)) {
       throw new Error('invalid request (empty values)');
     }
 
     await this.serialise();
-    connection = await Adapter.CONN.openConnection();
-    table = this.getTableName();
+    const connection = await Adapter.CONN.openConnection();
+    const table = this.getTableName();
     Adapter.debug(this.properties);
     return connection.collection(table).insert(this.properties);
   }
@@ -211,54 +208,47 @@ class Adapter extends AbstractAdapter {
    * @return {*|promise}
    */
   async UPDATE() {
-    let changes,
-      condition,
-      connection,
-      table;
+    let condition;
 
-    if (_isEmpty(this.original) || !this.original.get('id')) {
+    if (loIsEmpty(this.original) || !this.original.get('id')) {
       throw Boom.badRequest('bad conditions');
     }
 
     await this.serialise();
 
     condition = {
-      'id': new ObjectID(this.original.get('id'))
+      id: new ObjectID(this.original.get('id')),
     };
-    changes = this.getChanges();
+    const changes = this.getChanges();
 
-    if (_isEmpty(changes)) {
+    if (loIsEmpty(changes)) {
       throw new Error('invalid request (no changes)');
     }
 
     condition = this.conditionBuilder(condition);
-    connection = await Adapter.CONN.openConnection();
-    table = this.getTableName();
+    const connection = await Adapter.CONN.openConnection();
+    const table = this.getTableName();
 
-    return connection.collection(table).updateOne(condition, {$set: changes}).then(result => result.result.nModified > 0);
-
+    return connection.collection(table).updateOne(condition, { $set: changes }).then(result => result.result.nModified > 0);
   }
 
   /**
    * @return {*|promise}
    */
   async DELETE() {
-    let table,
-      sql,
-      condition,
-      connection;
+    let condition;
 
     if (!this.get('id')) {
       throw new Error('invalid request (no condition)');
     }
 
     condition = {
-      'id': new ObjectID(this.get('id'))
+      id: new ObjectID(this.get('id')),
     };
 
     condition = this.conditionBuilder(condition);
-    table = this.getTableName();
-    connection = await Adapter.CONN.openConnection();
+    const table = this.getTableName();
+    const connection = await Adapter.CONN.openConnection();
     return connection.collection(table).deleteOne(condition).then(result => result.deleteCount > 0);
   }
 }

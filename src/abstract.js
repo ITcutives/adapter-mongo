@@ -1,3 +1,4 @@
+/* eslint-disable no-unused-vars,class-methods-use-this */
 /**
  * Created by ashish on 27/4/17.
  */
@@ -34,6 +35,7 @@ class AbstractAdapter {
    */
   static debug(sql, args) {
     if (process.env.debug === 'true') {
+      // eslint-disable-next-line no-console
       console.log(sql, args);
     }
   }
@@ -62,8 +64,7 @@ class AbstractAdapter {
   }
 
   getChanges() {
-    let changes;
-    changes = {};
+    const changes = {};
     this.constructor.FIELDS.forEach((field) => {
       const currentValue = this.get(field);
       if (currentValue && currentValue !== this.original.get(field)) {
@@ -163,7 +164,7 @@ class AbstractAdapter {
    * @param entity
    * @param conditions
    * @param fields
-   * @return {Promise.<TResult>}
+   * @returns {Promise.<TResult>}
    * @constructor
    */
   FINDLINKS(entity, conditions, fields) {
@@ -174,7 +175,7 @@ class AbstractAdapter {
    *
    * @param entity
    * @param conditions
-   * @return {Promise.<TResult>}
+   * @returns {Promise.<TResult>}
    * @constructor
    */
   DELETELINK(entity, conditions) {
@@ -185,7 +186,7 @@ class AbstractAdapter {
    *
    * @param entity
    * @param record
-   * @return {Promise.<TResult>}
+   * @returns {Promise.<TResult>}
    * @constructor
    */
   SAVELINK(entity, record) {
