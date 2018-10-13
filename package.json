@@ -1,5 +1,5 @@
 {
-  "name": "adapter-mongo",
+  "name": "@itcutives/adapter-mongo",
   "version": "1.0.0",
   "description": "MongoDB Adapter for ITcutives API",
   "main": "index.js",
