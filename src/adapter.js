@@ -8,8 +8,15 @@ const loIsEmpty = require('lodash/isEmpty');
 const loClone = require('lodash/clone');
 const { ObjectID } = require('mongodb');
 const AbstractAdapter = require('./abstract');
+const Link = require('./link');
+
+const reflect = promise => promise.then(v => ({ v, status: 'resolved' })).catch(e => ({ e, status: 'rejected' }));
 
 class Adapter extends AbstractAdapter {
+  static get LINKELEMENT() {
+    return 'links';
+  }
+
   /**
    * @return {string}
    */
@@ -60,10 +67,23 @@ class Adapter extends AbstractAdapter {
           this.properties[field] = v;
         }
       });
+      // eslint-disable-next-line no-underscore-dangle
+      this.properties.id = entity._id;
+
+      this.relationships = entity[Adapter.LINKELEMENT] || {};
     }
   }
 
   serialise() {
+    loForEach(this.constructor.SERIALIZED, (v, k) => {
+      let value = this.get(k);
+      if (value) {
+        if (v === 'objectId') {
+          value = new ObjectID(value);
+        }
+        this.properties[k] = value;
+      }
+    });
     return Promise.resolve(this);
   }
 
@@ -71,9 +91,19 @@ class Adapter extends AbstractAdapter {
     return Promise.resolve(this);
   }
 
+  static isIdField(field) {
+    return (field === 'id' || field.indexOf('_id') !== -1);
+  }
+
+  static fixIdField(field) {
+    return field === 'id' ? '_id' : field;
+  }
+
   static convertKey(id) {
-    if (typeof id === 'string' && id.length === 24) {
-      return new ObjectID(id);
+    if (Array.isArray(id)) {
+      id = id.map(i => new ObjectID(i));
+    } else if (typeof id === 'string' && id.length === 24) {
+      id = new ObjectID(id);
     }
     return id;
   }
@@ -83,13 +113,15 @@ class Adapter extends AbstractAdapter {
    * @param conditions
    * @return {*}
    */
-  conditionBuilder(conditions) {
+  conditionBuilder(conditions = []) {
     let opr;
     let condition;
     let temp;
     let isFirst;
     let compiled;
     let where;
+    const lookups = [];
+    const addFields = [];
 
     isFirst = true;
     const sampleCondition = {
@@ -116,7 +148,6 @@ class Adapter extends AbstractAdapter {
     };
 
     compiled = {};
-
     loForEach(conditions, (cond, key) => {
       // for key-value pairs
       if (typeof cond !== 'object' || cond === null) {
@@ -138,6 +169,11 @@ class Adapter extends AbstractAdapter {
         condition = cond.condition.toLocaleLowerCase() === 'or' ? '$or' : '$and';
       }
 
+      if (Adapter.isIdField(cond.field)) {
+        cond.value = Adapter.convertKey(cond.value);
+        cond.field = Adapter.fixIdField(cond.field);
+      }
+
       where = { [cond.field]: {} };
       switch (opr) {
         case 'between':
@@ -152,14 +188,60 @@ class Adapter extends AbstractAdapter {
           };
           break;
         case '$eq':
-          where[cond.field] = cond.value;
+          // for joins
+          if (cond.field.indexOf('$') === 0) {
+            where.$eq = [cond.field, cond.value];
+          } else {
+            where[cond.field] = cond.value;
+          }
           break;
         case '$in':
         case '$nin':
-          if (!Array.isArray(cond.value)) {
+          if (cond.value.condition) {
+            let parentTable;
+            if (cond.value.class) {
+              const ClassConstructor = cond.value.class;
+              const instance = new ClassConstructor();
+              parentTable = instance.getTableName();
+            } else if (cond.value.table) {
+              // eslint-disable-next-line prefer-destructuring
+              parentTable = cond.value.table;
+            }
+            lookups.push({
+              $lookup: {
+                from: `${parentTable}`,
+                let: {
+                  id: `$${cond.field}`,
+                },
+                pipeline: [{
+                  $match: {
+                    $expr: {
+                      $and: [{
+                        $eq: [`$${cond.value.select}`, '$$id'],
+                      }],
+                    },
+                  },
+                }],
+                as: `${Adapter.LINKELEMENT}.${parentTable}`,
+              },
+            });
+            addFields.push({
+              $addFields: {
+                [`${Adapter.LINKELEMENT}.${parentTable}`]: {
+                  $map: {
+                    input: `$${Adapter.LINKELEMENT}.${parentTable}`,
+                    as: 'el',
+                    in: '$$el._id',
+                  },
+                },
+              },
+            });
+            where = { [`${Adapter.LINKELEMENT}.${parentTable}`]: { $elemMatch: this.conditionBuilder(cond.value.condition)[0].$match } };
+          } else if (!Array.isArray(cond.value)) {
             cond.value = [cond.value];
+            where[cond.field][opr] = cond.value;
           }
-        // falls through
+          break;
         default:
           where[cond.field][opr] = cond.value;
       }
@@ -172,7 +254,160 @@ class Adapter extends AbstractAdapter {
       }
       isFirst = false;
     });
-    return compiled;
+
+    let final = [];
+
+    if (lookups.length) {
+      final = final.concat(lookups);
+    }
+
+    final.push({ $match: compiled });
+
+    if (addFields) {
+      final = final.concat(addFields);
+    }
+
+    return final;
+  }
+
+  /**
+   *
+   * @param order
+   * @returns {*}
+   */
+  static getOrderByFields(order = []) {
+    if (!order || order.length <= 0) {
+      return {};
+    }
+    const orderBy = {};
+    // order
+    if (Array.isArray(order) === true) {
+      order.forEach((o) => {
+        if (o.indexOf('-') === 0) {
+          orderBy[o] = -1;
+        } else {
+          orderBy[o] = 1;
+        }
+      });
+    } else if (typeof order === 'object') {
+      loForEach(order, (value, key) => {
+        if (value.toLowerCase() === 'desc') {
+          orderBy[key] = -1;
+        } else {
+          orderBy[key] = 1;
+        }
+      });
+    } else {
+      orderBy[order] = 1;
+    }
+
+    return orderBy;
+  }
+
+  async toLink(fields, ModelPath) {
+    let link;
+    const links = this.constructor.LINKS;
+    const promises = [];
+    const object = this.properties;
+
+    object.links = {};
+    links.forEach((l) => {
+      if (fields && fields.indexOf(l.PLURAL) === -1) {
+        return;
+      }
+      link = new Link(this, l, this.relationships);
+      promises.push(link.toLink(object, ModelPath));
+    });
+    if (promises.length > 0) {
+      let results = await Promise.all(promises.map(reflect));
+      results = results.filter(x => x.status === 'resolved').map(x => x.v);
+      return Object.assign.apply({}, results);
+    }
+    return this.properties;
+  }
+
+  static async fromLink(Cls, object) {
+    let link;
+
+    const links = Cls.LINKS;
+    const promises = [];
+    const o = new Adapter();
+
+    links.forEach((l) => {
+      link = new Link(o, l);
+      promises.push(link.fromLink(object));
+    });
+
+    if (promises.length > 0) {
+      let results = await Promise.all(promises.map(reflect));
+      results = results.filter(x => x.status === 'resolved').map(x => x.v);
+      const result = Object.assign.apply({}, results);
+      return new Cls(result);
+    }
+    return new Cls(object);
+  }
+
+  /**
+   *
+   * @param select [] | * | ""
+   * @returns {*}
+   */
+  static getSelectFields(select = '*') {
+    let selected;
+    // check fields
+    if (Array.isArray(select)) {
+      selected = {};
+      select.forEach((s) => {
+        selected[s] = 1;
+      });
+    } else if (loIsEmpty(select) || select === '*') {
+      // default value
+      selected = undefined;
+    } else {
+      selected = { [select]: 1 };
+    }
+    return selected;
+  }
+
+  /**
+   *
+   * @returns {string}
+   */
+  getTableName() {
+    return this.constructor.TABLE;
+  }
+
+  async query(table, condition, select, order, from, limit) {
+    condition = await this.conditionBuilder(condition);
+    select = Adapter.getSelectFields(select);
+    order = Adapter.getOrderByFields(order);
+    let query = [];
+    if (!loIsEmpty(condition)) {
+      query = query.concat(condition);
+    }
+
+    if (select) {
+      if (JSON.stringify(condition).indexOf('"$lookup"') !== -1) {
+        select[Adapter.LINKELEMENT] = 1;
+      }
+      query.push({ $project: select });
+    }
+
+    if (!loIsEmpty(order)) {
+      query.push({ $sort: order });
+    }
+
+    if (from) {
+      query.push({ $skip: from });
+    }
+
+    if (limit) {
+      query.push({ $limit: limit });
+    }
+
+    Adapter.debug(JSON.stringify(query));
+    const connection = await Adapter.CONN.openConnection();
+    return connection.collection(table).aggregate(query).toArray();
   }
 
   /**
@@ -184,8 +419,12 @@ class Adapter extends AbstractAdapter {
    * @param limit
    * @return {*|promise}
    */
-  SELECT(condition, select, order, from, limit) {
-    throw Boom.badImplementation('[adapter] `SELECT` method not implemented');
+  async SELECT(condition, select, order, from, limit) {
+    const table = this.getTableName();
+    limit = limit || this.constructor.PAGESIZE;
+    const result = await this.query(table, condition, select, order, from, limit);
+    const Cls = this.constructor;
+    return Promise.all(result.map(v => new Cls(v)).map(v => v.deserialise()));
   }
 
   /**
@@ -201,7 +440,7 @@ class Adapter extends AbstractAdapter {
     const connection = await Adapter.CONN.openConnection();
     const table = this.getTableName();
     Adapter.debug(this.properties);
-    return connection.collection(table).insert(this.properties);
+    return connection.collection(table).insert(this.properties).then(r => r.insertedIds[0]);
   }
 
   /**
