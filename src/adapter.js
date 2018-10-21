@@ -7,7 +7,7 @@ const loForEach = require('lodash/forEach');
 const loIsEmpty = require('lodash/isEmpty');
 const loClone = require('lodash/clone');
 const { ObjectID } = require('mongodb');
-const AbstractAdapter = require('./abstract');
+const AbstractAdapter = require('@itcutives/adapter-memory/src/abstract');
 const Link = require('./link');
 
 const reflect = promise => promise.then(v => ({ v, status: 'resolved' })).catch(e => ({ e, status: 'rejected' }));

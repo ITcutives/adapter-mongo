@@ -2,7 +2,7 @@
  * Created by ashish on 02/05/18.
  */
 const { MongoClient } = require('mongodb');
-const AbstractConnection = require('./abstractConnection');
+const AbstractConnection = require('@itcutives/adapter-memory/src/abstractConnection');
 
 class Connection extends AbstractConnection {
   static get TYPE() {
