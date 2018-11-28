@@ -13,6 +13,7 @@ class Connection extends AbstractConnection {
     if (!this.connection) {
       return MongoClient.connect(this.config.url)
         .then((client) => {
+          this.client = client;
           this.connection = client.db(this.config.db);
           return this.connection;
         });
@@ -21,12 +22,13 @@ class Connection extends AbstractConnection {
   }
 
   closeConnection() {
-    const conn = this.connection;
+    const conn = this.client;
     if (!conn) {
       return Promise.resolve();
     }
     return conn.close()
       .then(() => {
+        this.client = undefined;
         this.connection = undefined;
       });
   }

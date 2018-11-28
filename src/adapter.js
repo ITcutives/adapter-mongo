@@ -5,6 +5,7 @@
 const Boom = require('boom');
 const loForEach = require('lodash/forEach');
 const loIsEmpty = require('lodash/isEmpty');
+const loReduce = require('lodash/reduce');
 const loClone = require('lodash/clone');
 const { ObjectID } = require('mongodb');
 const AbstractAdapter = require('@itcutives/adapter-memory/src/abstract');
@@ -68,7 +69,10 @@ class Adapter extends AbstractAdapter {
         }
       });
       // eslint-disable-next-line no-underscore-dangle
-      this.properties.id = entity._id;
+      if (entity._id && !entity.id) {
+        // eslint-disable-next-line no-underscore-dangle
+        this.properties.id = entity._id;
+      }
 
       this.relationships = entity[Adapter.LINKELEMENT] || {};
     }
@@ -239,6 +243,8 @@ class Adapter extends AbstractAdapter {
             where = { [`${Adapter.LINKELEMENT}.${parentTable}`]: { $elemMatch: this.conditionBuilder(cond.value.condition)[0].$match } };
           } else if (!Array.isArray(cond.value)) {
             cond.value = [cond.value];
+            where[cond.field][opr] = cond.value;
+          } else {
             where[cond.field][opr] = cond.value;
           }
           break;
@@ -439,8 +445,8 @@ class Adapter extends AbstractAdapter {
     await this.serialise();
     const connection = await Adapter.CONN.openConnection();
     const table = this.getTableName();
-    Adapter.debug(this.properties);
-    return connection.collection(table).insert(this.properties).then(r => r.insertedIds[0]);
+    Adapter.debug('INSERT:', JSON.stringify(this.properties));
+    return connection.collection(table).insert(this.properties).then(r => r.insertedIds['0']);
   }
 
   /**
@@ -448,6 +454,8 @@ class Adapter extends AbstractAdapter {
    */
   async UPDATE() {
     let condition;
+    let chg = [];
+    const set = {};
 
     if (loIsEmpty(this.original) || !this.original.get('id')) {
       throw Boom.badRequest('bad conditions');
@@ -456,7 +464,7 @@ class Adapter extends AbstractAdapter {
     await this.serialise();
 
     condition = {
-      id: new ObjectID(this.original.get('id')),
+      id: this.original.get('id').toString(),
     };
     const changes = this.getChanges();
 
@@ -464,11 +472,32 @@ class Adapter extends AbstractAdapter {
       throw new Error('invalid request (no changes)');
     }
 
-    condition = this.conditionBuilder(condition);
+    loForEach(changes, (value, key) => {
+      const o = Object.keys(value)[0];
+      if (o && o.indexOf('$') === 0) {
+        chg.push(value);
+      } else {
+        set[key] = value;
+      }
+    });
+    if (!loIsEmpty(set)) {
+      chg.push({ $set: set });
+    }
+    chg = loReduce(chg, (obj, n) => {
+      const k = Object.keys(n)[0];
+      if (obj[k]) {
+        obj[k] = Object.assign(obj[k], n[k]);
+      } else {
+        obj = Object.assign(obj, n);
+      }
+      return obj;
+    });
+
+    condition = this.conditionBuilder(condition)[0].$match;
+    Adapter.debug('UPDATE:', JSON.stringify({ condition, changes: chg }));
     const connection = await Adapter.CONN.openConnection();
     const table = this.getTableName();
-
-    return connection.collection(table).updateOne(condition, { $set: changes }).then(result => result.result.nModified > 0);
+    return connection.collection(table).updateOne(condition, chg).then(result => result.result.nModified > 0);
   }
 
   /**
@@ -482,10 +511,10 @@ class Adapter extends AbstractAdapter {
     }
 
     condition = {
-      id: new ObjectID(this.get('id')),
+      id: this.get('id'),
     };
 
-    condition = this.conditionBuilder(condition);
+    condition = this.conditionBuilder(condition)[0].$match;
     const table = this.getTableName();
     const connection = await Adapter.CONN.openConnection();
     return connection.collection(table).deleteOne(condition).then(result => result.deleteCount > 0);
