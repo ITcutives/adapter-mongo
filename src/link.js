@@ -75,7 +75,7 @@ class Link {
   async to1TOM(object, ModelPath) {
     // m2o
     const condition = {
-      [this.link]: object.id,
+      [this.link]: object.id.toString(),
     };
     const Cls = require(`${ModelPath}/models/${this.plural}`);
     const o = new Cls();
