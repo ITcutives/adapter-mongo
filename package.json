@@ -3,12 +3,10 @@
   "version": "1.0.0",
   "description": "MongoDB Adapter for ITcutives API",
   "main": "index.js",
-  "directories": {
-    "test": "test"
-  },
   "scripts": {
-    "test": "npm run lint && mocha --recursive",
-    "coverage": "./node_modules/.bin/nyc --reporter=lcov --reporter=text npm test",
+    "test": "jest",
+    "pretest": "npm run lint",
+    "coverage": "jest --coverage",
     "lint": "npx eslint ."
   },
   "repository": {
@@ -28,21 +26,15 @@
   },
   "homepage": "https://github.com/ITcutives/adapter-mongo#readme",
   "devDependencies": {
-    "chai": "^4.2.0",
-    "chai-as-promised": "^7.1.1",
-    "eslint": "^5.7.0",
+    "eslint": "^5.15.1",
     "eslint-config-airbnb-base": "^13.1.0",
-    "eslint-plugin-import": "^2.14.0",
-    "mocha": "^6.0.2",
-    "nyc": "^13.0.1",
-    "proxyquire": "^2.1.0",
-    "sinon": "^7.2.3",
-    "sinon-chai": "^3.2.0"
+    "eslint-plugin-import": "^2.16.0",
+    "jest": "^24.3.1"
   },
   "dependencies": {
-    "@itcutives/adapter-memory": "^1.0.0-beta",
-    "boom": "^7.2.0",
+    "@itcutives/adapter-memory": "^1.0.1",
+    "boom": "^7.3.0",
     "lodash": "^4.17.11",
-    "mongodb": "^3.1.8"
+    "mongodb": "^3.1.13"
   }
 }

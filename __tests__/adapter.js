@@ -1,9 +1,4 @@
-const chai = require('chai');
-const chaiAsPromised = require('chai-as-promised');
 const Mongo = require('../src/adapter');
-
-chai.use(chaiAsPromised);
-chai.should();
 
 describe('adapter', () => {
   describe('conditionBuilder', () => {
@@ -172,7 +167,7 @@ describe('adapter', () => {
 
     conditions.forEach((condition) => {
       it(`should build - ${JSON.stringify(condition.output)}`, () => {
-        mongo.conditionBuilder(condition.input).should.be.deep.eql(condition.output);
+        expect(mongo.conditionBuilder(condition.input)).toEqual([{ $match: condition.output }]);
       });
     });
   });
