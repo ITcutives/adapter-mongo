@@ -96,7 +96,7 @@ class Link {
       id = object[this.link];
       // int conversion because some of them are int(11) in mysql
       // eslint-disable-next-line no-restricted-globals
-      if (isNaN(parseInt(id, 10)) === false) {
+      if (isNaN(id) === false) {
         id = parseInt(id, 10);
       }
       object.links[this.plural] = id;

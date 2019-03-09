@@ -511,7 +511,7 @@ class Adapter extends AbstractAdapter {
     }
 
     condition = {
-      id: this.get('id'),
+      id: this.get('id').toString(),
     };
 
     condition = this.conditionBuilder(condition)[0].$match;
