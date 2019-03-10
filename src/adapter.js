@@ -78,7 +78,7 @@ class Adapter extends AbstractAdapter {
     }
   }
 
-  serialise() {
+  async serialise() {
     loForEach(this.constructor.SERIALIZED, (v, k) => {
       let value = this.get(k);
       if (value) {
@@ -88,11 +88,20 @@ class Adapter extends AbstractAdapter {
         this.properties[k] = value;
       }
     });
-    return Promise.resolve(this);
+    return this;
   }
 
-  deserialise() {
-    return Promise.resolve(this);
+  async deserialise() {
+    loForEach(this.constructor.SERIALIZED, (v, k) => {
+      let value = this.get(k);
+      if (value) {
+        if (v === 'objectId') {
+          value = value.toString();
+        }
+        this.properties[k] = value;
+      }
+    });
+    return this;
   }
 
   static isIdField(field) {
@@ -202,7 +211,7 @@ class Adapter extends AbstractAdapter {
         case '$in':
         case '$nin':
           if (cond.value.condition) {
-            let parentTable;
+            let parentTable = this.getTableName();
             if (cond.value.class) {
               const ClassConstructor = cond.value.class;
               const instance = new ClassConstructor();
@@ -290,7 +299,7 @@ class Adapter extends AbstractAdapter {
     if (Array.isArray(order) === true) {
       order.forEach((o) => {
         if (o.indexOf('-') === 0) {
-          orderBy[o] = -1;
+          orderBy[o.substr(1)] = -1;
         } else {
           orderBy[o] = 1;
         }
@@ -518,6 +527,18 @@ class Adapter extends AbstractAdapter {
     const table = this.getTableName();
     const connection = await Adapter.CONN.openConnection();
     return connection.collection(table).deleteOne(condition).then(result => result.deleteCount > 0);
+  }
+
+  /**
+   * @param entity
+   * @param conditions
+   * @param fields
+   * @returns {Promise<*>}
+   * @constructor
+   */
+  FINDLINKS(entity, conditions, fields) {
+    fields = this.constructor.getSelectFields(fields);
+    return this.query(entity, conditions, fields);
   }
 }
 

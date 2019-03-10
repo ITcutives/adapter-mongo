@@ -6,3 +6,42 @@
 
 - Like
 - Not like
+
+
+### Values/Changes
+
+The adapter takes care of serialisation/deserialisation defined under
+
+**Supported Types**
+
+- `objectId`
+
+
+```js
+  /**
+   * @returns {{}}
+   */
+  static get SERIALIZED() {
+    return {
+      "user_id": "objectId",
+    };
+  }
+```
+
+takes
+
+```js
+let object = {
+  "name": "ashish",
+  "user_id": "5bfbad79df84c01b759d96e4"
+};
+```
+
+and converts to
+
+```js
+let object = {
+  "name": "ashish",
+  "user_id": ObjectId("5bfbad79df84c01b759d96e4")
+};
+```
