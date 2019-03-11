@@ -22,7 +22,7 @@ class Link {
    * @param link
    * @param relationships
    */
-  constructor(db, link, relationships) {
+  constructor(db, link, relationships = {}) {
     this.db = db;
 
     this.type = link.TYPE;
@@ -75,7 +75,7 @@ class Link {
   async to1TOM(object, ModelPath) {
     // m2o
     const condition = {
-      [this.link]: object.id.toString(),
+      [this.link]: object.id,
     };
     const Cls = require(`${ModelPath}/models/${this.plural}`);
     const o = new Cls();

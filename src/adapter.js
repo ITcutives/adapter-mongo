@@ -473,7 +473,7 @@ class Adapter extends AbstractAdapter {
     await this.serialise();
 
     condition = {
-      id: this.original.get('id').toString(),
+      id: this.original.get('id'),
     };
     const changes = this.getChanges();
 
@@ -520,7 +520,7 @@ class Adapter extends AbstractAdapter {
     }
 
     condition = {
-      id: this.get('id').toString(),
+      id: this.get('id'),
     };
 
     condition = this.conditionBuilder(condition)[0].$match;
