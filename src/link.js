@@ -65,9 +65,10 @@ class Link {
     }
     // with join table
     const condition = {
-      [this.child]: object.id,
+      field: this.child,
+      value: object.id,
     };
-    const rec = await this.db.FINDLINKS(this.join, condition, this.link);
+    const rec = await this.db.FINDLINKS(this.join, [condition], this.link);
     object.links[this.plural] = rec.map(v => v[this.link]);
     return object;
   }

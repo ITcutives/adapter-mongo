@@ -326,8 +326,8 @@ class Adapter extends AbstractAdapter {
     const object = this.properties;
 
     object.links = {};
-    links.forEach((l) => {
-      if (fields && fields.indexOf(l.PLURAL) === -1) {
+    loForEach(links, (l, name) => {
+      if ((fields && fields.indexOf(l.PLURAL) === -1) || (!fields && l.TYPE !== '1TO1')) {
         return;
       }
       link = new Link(this, l, this.relationships);
@@ -536,8 +536,7 @@ class Adapter extends AbstractAdapter {
    * @returns {Promise<*>}
    * @constructor
    */
-  FINDLINKS(entity, conditions, fields) {
-    fields = this.constructor.getSelectFields(fields);
+  FINDLINKS(entity, conditions = [], fields) {
     return this.query(entity, conditions, fields);
   }
 }
