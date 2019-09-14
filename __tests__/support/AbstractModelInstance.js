@@ -2,6 +2,8 @@
  * Created by ashish on 17/5/17.
  */
 const path = require('path');
+const { ObjectID } = require('mongodb');
+const loClone = require('lodash/clone');
 const Model = require('../models/model');
 
 describe('AbstractModelInstance - MongoDB', () => {
@@ -106,7 +108,7 @@ describe('AbstractModelInstance - MongoDB', () => {
   });
 
   describe('conditionBuilder', () => {
-    let mysql;
+    let mongo;
     const conditions = [
       {
         description: 'should build aggregate query with $lookup with related table',
@@ -231,7 +233,7 @@ describe('AbstractModelInstance - MongoDB', () => {
 
     beforeEach(() => {
       Model.TABLE = 'table1';
-      mysql = new Model({});
+      mongo = new Model({});
     });
 
     afterEach(() => {
@@ -240,7 +242,7 @@ describe('AbstractModelInstance - MongoDB', () => {
 
     conditions.forEach((condition) => {
       it(condition.description, () => {
-        expect(mysql.conditionBuilder(condition.input)).toEqual(condition.output);
+        expect(mongo.conditionBuilder(condition.input)).toEqual(condition.output);
       });
     });
   });
@@ -272,49 +274,328 @@ describe('AbstractModelInstance - MongoDB', () => {
   });
 
   describe('SELECT', () => {
+    let mongo;
+    const sampleCondition = { a: 1, b: '2' };
+    const sampleSelect1 = ['a', 'b'];
+    const sampleSelect2 = 'a';
+    const sampleOrderby1 = ['a', 'b'];
+    const sampleOrderby2 = 'a';
+    const output = [{ a: 1, b: '1' }, { a: 1, b: '2' }];
+
+    const expectation = [
+      new Model(output[0]),
+      new Model(output[1]),
+    ];
+
+    beforeEach(() => {
+      mongo = new Model({});
+      mongo.query = jest.fn();
+    });
+
+    it('should select all rows of table', async () => {
+      mongo.query.mockResolvedValue(output);
+      Model.TABLE = 'table1';
+
+      await expect(mongo.SELECT()).resolves.toEqual(expectation);
+      expect(mongo.query).toHaveBeenCalledWith('table1', undefined, undefined, undefined, undefined, 100);
+    });
+
+    it('should select all fields where it matches condition', async () => {
+      mongo.query.mockResolvedValue([output[1]]);
+      Model.TABLE = 'table2';
+
+      await expect(mongo.SELECT(sampleCondition)).resolves.toEqual([expectation[1]]);
+      expect(mongo.query).toHaveBeenCalledWith('table2', sampleCondition, undefined, undefined, undefined, 100);
+    });
+
+    it('should select some fields where it matches condition', async () => {
+      mongo.query.mockResolvedValue([output[1]]);
+      Model.TABLE = 'table3';
+      await expect(mongo.SELECT(sampleCondition, sampleSelect1)).resolves.toEqual([expectation[1]]);
+      expect(mongo.query).toHaveBeenCalledWith('table3', sampleCondition, sampleSelect1, undefined, undefined, 100);
+    });
+
+    it('should select some fields where it matches condition and order by multiple fields', async () => {
+      mongo.query.mockResolvedValue([output[1]]);
+      Model.TABLE = 'table4';
+      await expect(mongo.SELECT(sampleCondition, sampleSelect2, sampleOrderby1)).resolves.toEqual([expectation[1]]);
+      expect(mongo.query).toHaveBeenCalledWith('table4', sampleCondition, sampleSelect2, sampleOrderby1, undefined, 100);
+    });
+
+    it('should select some fields where it matches condition and order by one field', async () => {
+      mongo.query.mockResolvedValue([output[1]]);
+      Model.TABLE = 'table5';
+      await expect(mongo.SELECT(sampleCondition, sampleSelect2, sampleOrderby2)).resolves.toEqual([expectation[1]]);
+      expect(mongo.query).toHaveBeenCalledWith('table5', sampleCondition, sampleSelect2, sampleOrderby2, undefined, 100);
+    });
+
+    it('query throws exception', async () => {
+      const err = new Error('mongo select error');
+      mongo.query.mockRejectedValue(err);
+      Model.TABLE = 'table6';
+      await expect(mongo.SELECT(sampleCondition)).rejects.toEqual(err);
+    });
   });
 
   describe('INSERT', () => {
+    let mongo;
+    let conn;
+
+    beforeEach(() => {
+      conn = {
+        insert: jest.fn(),
+        collection: jest.fn(),
+      };
+      conn.collection.mockReturnValue(conn);
+      Model.CONN = {};
+      Model.CONN.openConnection = jest.fn().mockResolvedValue(conn);
+      mongo = new Model({});
+    });
+
+    it('insert operation responds success', async () => {
+      conn.insert.mockResolvedValue({ insertedIds: ['5d7c67fd217ffe92f90b1b1b'] });
+      Model.TABLE = 'table';
+      mongo.set('a', 1);
+      mongo.set('b', 2);
+      await expect(mongo.INSERT()).resolves.toEqual('5d7c67fd217ffe92f90b1b1b');
+      expect(conn.insert).toHaveBeenCalledWith({ a: 1, b: 2 });
+      expect(conn.collection).toHaveBeenCalledWith('table');
+    });
+
+    it('insert operation throws exception', async () => {
+      const err = new Error('mongo insert error');
+      conn.insert.mockRejectedValue(err);
+      Model.TABLE = 'table2';
+      mongo.set('a', 1);
+      mongo.set('b', 2);
+      await expect(mongo.INSERT()).rejects.toEqual(err);
+      expect(conn.insert).toHaveBeenCalledWith({ a: 1, b: 2 });
+      expect(conn.collection).toHaveBeenCalledWith('table2');
+    });
+
+    it("INSERT throws exception 'invalid request (empty values)'", async () => {
+      Model.TABLE = 'table2';
+      await expect(mongo.INSERT()).rejects.toEqual(new Error('invalid request (empty values)'));
+    });
   });
 
   describe('UPDATE', () => {
+    let mongo;
+    let object;
+    let conn;
+
+    beforeEach(() => {
+      conn = {
+        updateOne: jest.fn(),
+        collection: jest.fn(),
+      };
+      conn.collection.mockReturnValue(conn);
+      Model.CONN = {};
+      Model.CONN.openConnection = jest.fn().mockResolvedValue(conn);
+      object = {
+        id: '5d7c67fd217ffe92f90b1b1b',
+        a: 1,
+        b: '2',
+        jsonField: {
+          name: 'ashish',
+          address: { street: '21b baker st' },
+        },
+      };
+      mongo = new Model(object);
+      mongo.setOriginal(new Model({ ...object }));
+    });
+
+    it('should throw error if original is not set', async () => {
+      delete mongo.original;
+      await expect(mongo.UPDATE()).rejects.toEqual(new Error('bad conditions'));
+    });
+
+    it('should throw error if original.id is not set', async () => {
+      mongo.original.remove('id');
+      await expect(mongo.UPDATE()).rejects.toEqual(new Error('bad conditions'));
+    });
+
+    it('should throw error if there are no changes', async () => {
+      await expect(mongo.UPDATE()).rejects.toEqual(new Error('invalid request (no changes)'));
+    });
+
+    it('should prepare the changes and execute updateOne', async () => {
+      conn.updateOne.mockResolvedValue({ result: { nModified: 1 } });
+      Model.TABLE = 'table1';
+      mongo.set('a', 10);
+      await expect(mongo.UPDATE()).resolves.toEqual(true);
+      expect(conn.updateOne).toHaveBeenCalledWith({ _id: new ObjectID(object.id) }, { $set: { a: 10 } });
+      expect(conn.collection).toHaveBeenCalledWith('table1');
+    });
+
+    it('should prepare the changes and execute updateOne (mongo specific feature)', async () => {
+      conn.updateOne.mockResolvedValue({ result: { nModified: 1 } });
+      Model.TABLE = 'table3';
+      mongo.set('a', { $inc: { a: 1 } });
+      mongo.set('jsonField', {
+        address: { street: '21b baker steet', postcode: 222 },
+      });
+      await expect(mongo.UPDATE()).resolves.toEqual(true);
+      expect(conn.updateOne).toHaveBeenCalledWith({ _id: new ObjectID(object.id) }, {
+        $inc: { a: 1 },
+        $set: {
+          jsonField: {
+            address: { street: '21b baker steet', postcode: 222 },
+          },
+        },
+      });
+      expect(conn.collection).toHaveBeenCalledWith('table3');
+    });
+  });
+
+  describe('DELETE', () => {
+    let mongo;
+    let conn;
+    const sampleCondition = { id: '5d7c67fd217ffe92f90b1b1b', a: 1, b: '2' };
+
+    beforeEach(() => {
+      conn = {
+        deleteOne: jest.fn(),
+        collection: jest.fn(),
+      };
+      conn.collection.mockReturnValue(conn);
+      Model.CONN = {};
+      Model.CONN.openConnection = jest.fn().mockResolvedValue(conn);
+      mongo = new Model(sampleCondition);
+    });
+
+    it('deleteOne responds success', async () => {
+      conn.deleteOne.mockResolvedValue({ deleteCount: 1 });
+      Model.TABLE = 'table1';
+      await expect(mongo.DELETE()).resolves.toBe(true);
+      expect(conn.deleteOne).toHaveBeenCalledWith({ _id: new ObjectID(sampleCondition.id) });
+      expect(conn.collection).toHaveBeenCalledWith('table1');
+    });
+
+    it('deleteOne throws exception', async () => {
+      const err = new Error('mongo delete error');
+      conn.deleteOne.mockRejectedValue(err);
+      Model.TABLE = 'table2';
+      await expect(mongo.DELETE()).rejects.toEqual(err);
+      expect(conn.deleteOne).toHaveBeenCalledWith({ _id: new ObjectID(sampleCondition.id) });
+      expect(conn.collection).toHaveBeenCalledWith('table2');
+    });
+
+    it('delete throws exception (no condition)', async () => {
+      Model.TABLE = 'table2';
+      delete mongo.properties;
+      await expect(mongo.DELETE()).rejects.toEqual(new Error('invalid request (no condition)'));
+    });
   });
 
   describe('serialise', () => {
+    let model = null;
+
+    it('should not make any difference if there is no property that needs serialisation', async () => {
+      const props = {
+        a: 10,
+        b: 20,
+      };
+      model = new Model(props);
+      await model.serialise();
+      expect(model.properties).toEqual(props);
+    });
+
+    it('should not modify serialised property', async () => {
+      const props = {
+        a: 10,
+        objectIdField: new ObjectID('5d7c67fd217ffe92f90b1b1b'),
+      };
+      model = new Model(props);
+      await model.serialise();
+      expect(model.properties).toEqual(props);
+    });
+
+    it('should convert property from string to objectId', async () => {
+      const props = {
+        a: 10,
+        objectIdField: '5d7c67fd217ffe92f90b1b1b',
+      };
+      const expectation = loClone(props);
+      expectation.objectIdField = new ObjectID(expectation.objectIdField);
+      model = new Model(props);
+      await model.serialise();
+      expect(model.properties).toEqual(expectation);
+    });
   });
 
   describe('deserialise', () => {
+    let model = null;
+
+    it('should not make any difference if there is no property that needs deserialisation', async () => {
+      const props = {
+        a: 10,
+        b: 20,
+      };
+      model = new Model(props);
+      await model.deserialise();
+      expect(model.properties).toEqual(props);
+    });
+
+    it('should not modify string', async () => {
+      const props = {
+        a: 10,
+        objectIdField: '5d7c67fd217ffe92f90b1b1b',
+      };
+      model = new Model(props);
+      await model.deserialise();
+      expect(model.properties).toEqual(props);
+    });
+
+    it('should convert property from objectId to string', async () => {
+      const expectation = {
+        a: 10,
+        objectIdField: '5d7c67fd217ffe92f90b1b1b',
+      };
+      const props = loClone(expectation);
+      props.objectIdField = new ObjectID(props.objectIdField);
+      model = new Model(props);
+      await model.deserialise();
+      expect(model.properties).toEqual(expectation);
+    });
   });
 
-  describe('REVIEW: FINDLINKS', () => {
-    let mysql;
+  describe('FINDLINKS', () => {
+    let mongo;
     const output = [{ user_id: 1 }, { user_id: 2 }];
 
     beforeEach(() => {
-      mysql = new Model({});
+      mongo = new Model({});
     });
 
     it('should return raw results', async () => {
-      mysql.query = jest.fn().mockResolvedValue(output);
-      const result = await mysql.FINDLINKS('user_role', { role_id: 1 }, 'user_id');
-      expect(mysql.query).toHaveBeenCalledWith('user_role', { role_id: 1 }, { user_id: 1 });
+      mongo.query = jest.fn().mockResolvedValue(output);
+      const result = await mongo.FINDLINKS('user_role', { role_id: 1 }, 'user_id');
+      expect(mongo.query).toHaveBeenCalledWith('user_role', { role_id: 1 }, 'user_id');
       expect(result).toEqual(output);
     });
 
-    it('should forward error thrown by rawQuery', async () => {
-      const error = new Error('mysql findlinks error');
-      mysql.query = jest.fn().mockRejectedValue(error);
-      expect(mysql.FINDLINKS('user_role', { user_id: 1 }, 'role_id')).rejects.toEqual(error);
-      expect(mysql.query).toHaveBeenCalledWith('user_role', { user_id: 1 }, { role_id: 1 });
+    it('should return raw results (use default value)', async () => {
+      mongo.query = jest.fn().mockResolvedValue(output);
+      const result = await mongo.FINDLINKS('user_role', undefined, 'user_id');
+      expect(mongo.query).toHaveBeenCalledWith('user_role', [], 'user_id');
+      expect(result).toEqual(output);
+    });
+
+    it('should forward error thrown by query', async () => {
+      const error = new Error('mongo findlinks error');
+      mongo.query = jest.fn().mockRejectedValue(error);
+      expect(mongo.FINDLINKS('user_role', { user_id: 1 }, 'role_id')).rejects.toEqual(error);
+      expect(mongo.query).toHaveBeenCalledWith('user_role', { user_id: 1 }, 'role_id');
     });
   });
 
   describe('toLink', () => {
-    let mysql;
+    let mongo;
     let Related;
 
     beforeEach(() => {
-      mysql = new Model({
+      mongo = new Model({
         id: 1,
         name: 'test',
         plan_id: '3',
@@ -351,7 +632,7 @@ describe('AbstractModelInstance - MongoDB', () => {
       ];
       Related = require('../models/relatives');
       Related.prototype.SELECT = jest.fn().mockResolvedValue([new Related({ id: 300 })]);
-      mysql.FINDLINKS = jest.fn().mockRejectedValue(new Error('BAD Table'));
+      mongo.FINDLINKS = jest.fn().mockRejectedValue(new Error('BAD Table'));
     });
 
     afterEach(() => {
@@ -359,9 +640,9 @@ describe('AbstractModelInstance - MongoDB', () => {
     });
 
     it('should correctly process link details and handle errors when requested', async () => {
-      const result = await mysql.toLink(['relatives', 'plans', 'gateways'], path.join(__dirname, '..'));
+      const result = await mongo.toLink(['relatives', 'plans', 'gateways'], path.join(__dirname, '..'));
       expect(Related.prototype.SELECT).toHaveBeenCalled();
-      expect(mysql.FINDLINKS).toHaveBeenCalled();
+      expect(mongo.FINDLINKS).toHaveBeenCalled();
       expect(result).toEqual({
         id: 1,
         name: 'test',
@@ -373,9 +654,9 @@ describe('AbstractModelInstance - MongoDB', () => {
     });
 
     it('should not do anything if link fields argument is empty', async () => {
-      const result = await mysql.toLink([], path.join(__dirname, '..'));
+      const result = await mongo.toLink([], path.join(__dirname, '..'));
       expect(Related.prototype.SELECT).not.toHaveBeenCalled();
-      expect(mysql.FINDLINKS).not.toHaveBeenCalled();
+      expect(mongo.FINDLINKS).not.toHaveBeenCalled();
       expect(result).toEqual({
         id: 1,
         name: 'test',

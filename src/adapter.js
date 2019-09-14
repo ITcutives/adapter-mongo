@@ -2,7 +2,6 @@
 /**
  * Created by ashish on 02/05/18.
  */
-const Boom = require('boom');
 const loForEach = require('lodash/forEach');
 const loIsEmpty = require('lodash/isEmpty');
 const loReduce = require('lodash/reduce');
@@ -11,7 +10,7 @@ const { ObjectID } = require('mongodb');
 const AbstractAdapter = require('@itcutives/adapter-memory/src/abstract');
 const Link = require('./link');
 
-const reflect = promise => promise.then(v => ({ v, status: 'resolved' })).catch(e => ({ e, status: 'rejected' }));
+const reflect = (promise) => promise.then((v) => ({ v, status: 'resolved' })).catch((e) => ({ e, status: 'rejected' }));
 
 class Adapter extends AbstractAdapter {
   static get LINKELEMENT() {
@@ -114,7 +113,7 @@ class Adapter extends AbstractAdapter {
 
   static convertKey(id) {
     if (Array.isArray(id)) {
-      id = id.map(i => new ObjectID(i));
+      id = id.map((i) => new ObjectID(i));
     } else if (typeof id === 'string' && id.length === 24) {
       id = new ObjectID(id);
     }
@@ -335,7 +334,7 @@ class Adapter extends AbstractAdapter {
     });
     if (promises.length > 0) {
       let results = await Promise.all(promises.map(reflect));
-      results = results.filter(x => x.status === 'resolved').map(x => x.v);
+      results = results.filter((x) => x.status === 'resolved').map((x) => x.v);
       return Object.assign.apply({}, results);
     }
     return this.properties;
@@ -355,7 +354,7 @@ class Adapter extends AbstractAdapter {
 
     if (promises.length > 0) {
       let results = await Promise.all(promises.map(reflect));
-      results = results.filter(x => x.status === 'resolved').map(x => x.v);
+      results = results.filter((x) => x.status === 'resolved').map((x) => x.v);
       const result = Object.assign.apply({}, results);
       return new Cls(result);
     }
@@ -439,7 +438,7 @@ class Adapter extends AbstractAdapter {
     limit = limit || this.constructor.PAGESIZE;
     const result = await this.query(table, condition, select, order, from, limit);
     const Cls = this.constructor;
-    return Promise.all(result.map(v => new Cls(v)).map(v => v.deserialise()));
+    return Promise.all(result.map((v) => new Cls(v)).map((v) => v.deserialise()));
   }
 
   /**
@@ -455,7 +454,7 @@ class Adapter extends AbstractAdapter {
     const connection = await Adapter.CONN.openConnection();
     const table = this.getTableName();
     Adapter.debug('INSERT:', JSON.stringify(this.properties));
-    return connection.collection(table).insert(this.properties).then(r => r.insertedIds['0']);
+    return connection.collection(table).insert(this.properties).then((r) => r.insertedIds['0']);
   }
 
   /**
@@ -467,7 +466,7 @@ class Adapter extends AbstractAdapter {
     const set = {};
 
     if (loIsEmpty(this.original) || !this.original.get('id')) {
-      throw Boom.badRequest('bad conditions');
+      throw new Error('bad conditions');
     }
 
     await this.serialise();
@@ -506,7 +505,7 @@ class Adapter extends AbstractAdapter {
     Adapter.debug('UPDATE:', JSON.stringify({ condition, changes: chg }));
     const connection = await Adapter.CONN.openConnection();
     const table = this.getTableName();
-    return connection.collection(table).updateOne(condition, chg).then(result => result.result.nModified > 0);
+    return connection.collection(table).updateOne(condition, chg).then((result) => result.result.nModified > 0);
   }
 
   /**
@@ -526,7 +525,7 @@ class Adapter extends AbstractAdapter {
     condition = this.conditionBuilder(condition)[0].$match;
     const table = this.getTableName();
     const connection = await Adapter.CONN.openConnection();
-    return connection.collection(table).deleteOne(condition).then(result => result.deleteCount > 0);
+    return connection.collection(table).deleteOne(condition).then((result) => result.deleteCount > 0);
   }
 
   /**

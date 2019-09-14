@@ -29,7 +29,7 @@ class Model extends Adapter {
    */
   static get SERIALIZED() {
     return {
-      jsonfield: 'json',
+      objectIdField: 'objectId',
     };
   }
 
@@ -60,7 +60,7 @@ class Model extends Adapter {
    * @returns {Array}
    */
   static get FIELDS() {
-    return ['id', 'a', 'b', 'jsonfield', 'name', 'plan_id'];
+    return ['id', 'a', 'b', 'objectIdField', 'name', 'plan_id', 'jsonField'];
   }
 
   /**

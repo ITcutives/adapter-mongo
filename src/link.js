@@ -69,7 +69,7 @@ class Link {
       value: object.id,
     };
     const rec = await this.db.FINDLINKS(this.join, [condition], this.link);
-    object.links[this.plural] = rec.map(v => v[this.link]);
+    object.links[this.plural] = rec.map((v) => v[this.link]);
     return object;
   }
 
@@ -86,7 +86,7 @@ class Link {
       return object;
     }
     const rec = await o.SELECT(condition, 'id');
-    object.links[this.plural] = rec.map(v => v.get('id'));
+    object.links[this.plural] = rec.map((v) => v.get('id'));
     return object;
   }
 

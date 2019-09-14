@@ -23,6 +23,18 @@ describe('adapter', () => {
       expect(Mongo.getSelectFields(fields)).toEqual({ 'a.b.c': 1 });
       done();
     });
+
+    it('should return undefined when all fields are requested', (done) => {
+      const fields = '*';
+      expect(Mongo.getSelectFields(fields)).toEqual(undefined);
+      done();
+    });
+
+    it('should return undefined when all fields are requested (default value of fields argument)', (done) => {
+      const fields = undefined;
+      expect(Mongo.getSelectFields(fields)).toEqual(undefined);
+      done();
+    });
   });
 
   describe('getOrderByFields', () => {
