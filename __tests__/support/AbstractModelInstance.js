@@ -111,6 +111,21 @@ describe('AbstractModelInstance - MongoDB', () => {
     let mongo;
     const conditions = [
       {
+        description: 'should build aggregate query comparing two fields',
+        input: [{
+          field: '$a',
+          value: '$b',
+        }],
+        output: [{
+          $match: {
+            $eq: [
+              '$a',
+              '$b',
+            ],
+          },
+        }],
+      },
+      {
         description: 'should build aggregate query with $lookup with related table',
         input: [{
           field: 'id',
@@ -229,6 +244,66 @@ describe('AbstractModelInstance - MongoDB', () => {
         ]
         ,
       },
+      {
+        description: 'should build aggregate query with $lookup with table name provided',
+        input: [{
+          field: 'id',
+          operator: 'in',
+          value: {
+            select: 'a_id',
+            table: 'table2',
+            condition: { a_id: 'abc' },
+          },
+        }],
+        output: [
+          {
+            $lookup: {
+              from: 'table2',
+              let: {
+                id: '$_id',
+              },
+              pipeline: [
+                {
+                  $match: {
+                    $expr: {
+                      $and: [
+                        {
+                          $eq: [
+                            '$a_id',
+                            '$$id',
+                          ],
+                        },
+                      ],
+                    },
+                  },
+                },
+              ],
+              as: 'links.table2',
+            },
+          },
+          {
+            $match: {
+              'links.table2': {
+                $elemMatch: {
+                  a_id: 'abc',
+                },
+              },
+            },
+          },
+          {
+            $addFields: {
+              'links.table2': {
+                $map: {
+                  input: '$links.table2',
+                  as: 'el',
+                  in: '$$el._id',
+                },
+              },
+            },
+          },
+        ]
+        ,
+      },
     ];
 
     beforeEach(() => {
@@ -271,6 +346,139 @@ describe('AbstractModelInstance - MongoDB', () => {
   });
 
   describe('query', () => {
+    let mongo;
+    let conn;
+    let object;
+    let condition;
+
+    beforeEach(() => {
+      conn = {
+        aggregate: jest.fn(),
+        collection: jest.fn(),
+        toArray: jest.fn(),
+      };
+      conn.collection.mockReturnValue(conn);
+      conn.aggregate.mockReturnValue(conn);
+      object = {
+        a: 10,
+        b: 20,
+      };
+      conn.toArray.mockResolvedValue([object]);
+      condition = [{ field: 'a', value: '10' }];
+      Model.CONN = {};
+      Model.CONN.openConnection = jest.fn().mockResolvedValue(conn);
+      mongo = new Model();
+    });
+
+    it('should run aggregate function without conditions', async () => {
+      await expect(mongo.query('table1')).resolves.toEqual([object]);
+      expect(conn.aggregate).toHaveBeenCalledWith([]);
+      expect(conn.collection).toHaveBeenCalledWith('table1');
+    });
+
+    it('should run aggregate function with conditions', async () => {
+      await expect(mongo.query('table1', condition)).resolves.toEqual([object]);
+      expect(conn.aggregate).toHaveBeenCalledWith([{ $match: { a: '10' } }]);
+      expect(conn.collection).toHaveBeenCalledWith('table1');
+    });
+
+    it('should run aggregate function with selected fields to project', async () => {
+      await expect(mongo.query('table1', condition, ['a', 'b'])).resolves.toEqual([object]);
+      expect(conn.aggregate).toHaveBeenCalledWith([{ $match: { a: '10' } }, { $project: { a: 1, b: 1 } }]);
+      expect(conn.collection).toHaveBeenCalledWith('table1');
+    });
+
+    it('should run aggregate function with selected fields to project (join table)', async () => {
+      condition = [{
+        field: 'id',
+        operator: 'in',
+        value: {
+          class: require('../models/relatives'),
+          select: 'a_id',
+          condition: { a_id: 'abc' },
+        },
+      }];
+      await expect(mongo.query('table1', condition, ['a', 'b'])).resolves.toEqual([object]);
+      expect(conn.aggregate).toHaveBeenCalledWith([
+        {
+          $lookup: {
+            from: 'related',
+            let: {
+              id: '$_id',
+            },
+            pipeline: [
+              {
+                $match: {
+                  $expr: {
+                    $and: [
+                      {
+                        $eq: [
+                          '$a_id',
+                          '$$id',
+                        ],
+                      },
+                    ],
+                  },
+                },
+              },
+            ],
+            as: 'links.related',
+          },
+        },
+        {
+          $match: {
+            'links.related': {
+              $elemMatch: {
+                a_id: 'abc',
+              },
+            },
+          },
+        },
+        {
+          $addFields: {
+            'links.related': {
+              $map: {
+                input: '$links.related',
+                as: 'el',
+                in: '$$el._id',
+              },
+            },
+          },
+        },
+        { $project: { a: 1, b: 1, links: 1 } },
+      ]);
+      expect(conn.collection).toHaveBeenCalledWith('table1');
+    });
+
+    it('should run aggregate function with sort fields', async () => {
+      await expect(mongo.query('table1', condition, ['a', 'b'], ['a', '-b'])).resolves.toEqual([object]);
+      expect(conn.aggregate).toHaveBeenCalledWith([
+        { $match: { a: '10' } },
+        { $project: { a: 1, b: 1 } },
+        { $sort: { a: 1, b: -1 } },
+      ]);
+      expect(conn.collection).toHaveBeenCalledWith('table1');
+    });
+
+    it('should run aggregate function with from and limit fields', async () => {
+      await expect(mongo.query('table1', condition, ['a', 'b'], ['a', '-b'], 10, 100)).resolves.toEqual([object]);
+      expect(conn.aggregate).toHaveBeenCalledWith([
+        { $match: { a: '10' } },
+        { $project: { a: 1, b: 1 } },
+        { $sort: { a: 1, b: -1 } },
+        { $skip: 10 },
+        { $limit: 100 },
+      ]);
+      expect(conn.collection).toHaveBeenCalledWith('table1');
+    });
+
+    it('should throw error when query fails to execute', async () => {
+      const err = new Error('mongo aggregate error');
+      conn.toArray.mockRejectedValue(err);
+      await expect(mongo.query('table1')).rejects.toEqual(err);
+      expect(conn.aggregate).toHaveBeenCalledWith([]);
+      expect(conn.collection).toHaveBeenCalledWith('table1');
+    });
   });
 
   describe('SELECT', () => {
@@ -432,17 +640,29 @@ describe('AbstractModelInstance - MongoDB', () => {
       conn.updateOne.mockResolvedValue({ result: { nModified: 1 } });
       Model.TABLE = 'table3';
       mongo.set('a', { $inc: { a: 1 } });
+      mongo.set('b', { $inc: { b: 11 } });
       mongo.set('jsonField', {
         address: { street: '21b baker steet', postcode: 222 },
       });
       await expect(mongo.UPDATE()).resolves.toEqual(true);
       expect(conn.updateOne).toHaveBeenCalledWith({ _id: new ObjectID(object.id) }, {
-        $inc: { a: 1 },
+        $inc: { a: 1, b: 11 },
         $set: {
           jsonField: {
             address: { street: '21b baker steet', postcode: 222 },
           },
         },
+      });
+      expect(conn.collection).toHaveBeenCalledWith('table3');
+    });
+
+    it('should prepare the changes (just $inc, without normal changes) and execute updateOne (mongo specific feature)', async () => {
+      conn.updateOne.mockResolvedValue({ result: { nModified: 1 } });
+      Model.TABLE = 'table3';
+      mongo.set('a', { $inc: { a: 1 } });
+      await expect(mongo.UPDATE()).resolves.toEqual(true);
+      expect(conn.updateOne).toHaveBeenCalledWith({ _id: new ObjectID(object.id) }, {
+        $inc: { a: 1 },
       });
       expect(conn.collection).toHaveBeenCalledWith('table3');
     });
@@ -649,6 +869,19 @@ describe('AbstractModelInstance - MongoDB', () => {
         links: {
           plans: 3,
           relatives: [300],
+        },
+      });
+    });
+
+    it('should not do anything if link fields argument is undefined', async () => {
+      const result = await mongo.toLink(undefined, path.join(__dirname, '..'));
+      expect(Related.prototype.SELECT).not.toHaveBeenCalled();
+      expect(mongo.FINDLINKS).not.toHaveBeenCalled();
+      expect(result).toEqual({
+        id: 1,
+        name: 'test',
+        links: {
+          plans: 3,
         },
       });
     });

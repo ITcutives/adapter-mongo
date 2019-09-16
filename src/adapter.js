@@ -1,4 +1,4 @@
-/* eslint-disable no-param-reassign,no-unused-vars,class-methods-use-this */
+/* eslint-disable no-param-reassign */
 /**
  * Created by ashish on 02/05/18.
  */
@@ -81,8 +81,11 @@ class Adapter extends AbstractAdapter {
     loForEach(this.constructor.SERIALIZED, (v, k) => {
       let value = this.get(k);
       if (value) {
-        if (v === 'objectId') {
-          value = new ObjectID(value);
+        // eslint-disable-next-line default-case
+        switch (v) {
+          case 'objectId':
+            value = new ObjectID(value);
+            break;
         }
         this.properties[k] = value;
       }
@@ -94,8 +97,11 @@ class Adapter extends AbstractAdapter {
     loForEach(this.constructor.SERIALIZED, (v, k) => {
       let value = this.get(k);
       if (value) {
-        if (v === 'objectId') {
-          value = value.toString();
+        // eslint-disable-next-line default-case
+        switch (v) {
+          case 'objectId':
+            value = value.toString();
+            break;
         }
         this.properties[k] = value;
       }
@@ -200,9 +206,9 @@ class Adapter extends AbstractAdapter {
           };
           break;
         case '$eq':
-          // for joins
-          if (cond.field.indexOf('$') === 0) {
-            where.$eq = [cond.field, cond.value];
+          // for joins (very specific use case)
+          if (cond.field.indexOf('$') === 0 && cond.value.indexOf('$') === 0) {
+            where = { $eq: [cond.field, cond.value] };
           } else {
             where[cond.field] = cond.value;
           }
@@ -275,9 +281,11 @@ class Adapter extends AbstractAdapter {
       final = final.concat(lookups);
     }
 
-    final.push({ $match: compiled });
+    if (!loIsEmpty(compiled)) {
+      final.push({ $match: compiled });
+    }
 
-    if (addFields) {
+    if (!loIsEmpty(addFields)) {
       final = final.concat(addFields);
     }
 
@@ -325,7 +333,7 @@ class Adapter extends AbstractAdapter {
     const object = this.properties;
 
     object.links = {};
-    loForEach(links, (l, name) => {
+    loForEach(links, (l) => {
       if ((fields && fields.indexOf(l.PLURAL) === -1) || (!fields && l.TYPE !== '1TO1')) {
         return;
       }
@@ -442,10 +450,9 @@ class Adapter extends AbstractAdapter {
   }
 
   /**
-   * @param values
    * @return {*|promise}
    */
-  async INSERT(values) {
+  async INSERT() {
     if (loIsEmpty(this.properties)) {
       throw new Error('invalid request (empty values)');
     }
@@ -491,6 +498,7 @@ class Adapter extends AbstractAdapter {
     if (!loIsEmpty(set)) {
       chg.push({ $set: set });
     }
+    // merge multiple $inc operations
     chg = loReduce(chg, (obj, n) => {
       const k = Object.keys(n)[0];
       if (obj[k]) {

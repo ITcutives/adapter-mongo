@@ -1,3 +1,4 @@
+const { ObjectID } = require('mongodb');
 const Mongo = require('../src/adapter');
 
 describe('adapter', () => {
@@ -94,17 +95,19 @@ describe('adapter', () => {
             value: [3, '4', 'x'],
           },
         },
-        output: {
-          $and: [
-            { c: { $in: [3, '4', 'x'] } },
-            {
-              $and: [
-                { b: 2 },
-                { a: 1 },
-              ],
-            },
-          ],
-        },
+        output: [{
+          $match: {
+            $and: [
+              { c: { $in: [3, '4', 'x'] } },
+              {
+                $and: [
+                  { b: 2 },
+                  { a: 1 },
+                ],
+              },
+            ],
+          },
+        }],
       },
       {
         input: {
@@ -116,17 +119,19 @@ describe('adapter', () => {
             value: [3, '4', 'x'],
           },
         },
-        output: {
-          $and: [
-            { 'c.d': { $in: [3, '4', 'x'] } },
-            {
-              $and: [
-                { 'b.c': 2 },
-                { a: 1 },
-              ],
-            },
-          ],
-        },
+        output: [{
+          $match: {
+            $and: [
+              { 'c.d': { $in: [3, '4', 'x'] } },
+              {
+                $and: [
+                  { 'b.c': 2 },
+                  { a: 1 },
+                ],
+              },
+            ],
+          },
+        }],
       },
       {
         input: {
@@ -138,17 +143,19 @@ describe('adapter', () => {
             value: 'a',
           },
         },
-        output: {
-          $and: [
-            { c: { $in: ['a'] } },
-            {
-              $and: [
-                { b: 2 },
-                { a: 1 },
-              ],
-            },
-          ],
-        },
+        output: [{
+          $match: {
+            $and: [
+              { c: { $in: ['a'] } },
+              {
+                $and: [
+                  { b: 2 },
+                  { a: 1 },
+                ],
+              },
+            ],
+          },
+        }],
       },
       {
         input: {
@@ -160,17 +167,19 @@ describe('adapter', () => {
             value: 'a',
           },
         },
-        output: {
-          $and: [
-            { c: { $nin: ['a'] } },
-            {
-              $and: [
-                { b: 2 },
-                { a: 1 },
-              ],
-            },
-          ],
-        },
+        output: [{
+          $match: {
+            $and: [
+              { c: { $nin: ['a'] } },
+              {
+                $and: [
+                  { b: 2 },
+                  { a: 1 },
+                ],
+              },
+            ],
+          },
+        }],
       },
       {
         input: [
@@ -185,12 +194,14 @@ describe('adapter', () => {
             condition: 'OR',
           },
         ],
-        output: {
-          $or: [
-            { b: { $ne: '2' } },
-            { a: 1 },
-          ],
-        },
+        output: [{
+          $match: {
+            $or: [
+              { b: { $ne: '2' } },
+              { a: 1 },
+            ],
+          },
+        }],
       },
       {
         input: [
@@ -206,12 +217,14 @@ describe('adapter', () => {
             condition: 'AND',
           },
         ],
-        output: {
-          $and: [
-            { d: { $ne: null } },
-            { c: null },
-          ],
-        },
+        output: [{
+          $match: {
+            $and: [
+              { d: { $ne: null } },
+              { c: null },
+            ],
+          },
+        }],
       },
       {
         input: [
@@ -227,16 +240,18 @@ describe('adapter', () => {
             condition: 'OR',
           },
         ],
-        output: {
-          $or: [
-            { y: { $regex: new RegExp('/find/') } },
-            { x: { $gte: 10, $lte: 20 } },
-          ],
-        },
+        output: [{
+          $match: {
+            $or: [
+              { y: { $regex: new RegExp('/find/') } },
+              { x: { $gte: 10, $lte: 20 } },
+            ],
+          },
+        }],
       },
       {
-        input: null,
-        output: {},
+        input: undefined,
+        output: [],
       },
     ];
 
@@ -246,7 +261,7 @@ describe('adapter', () => {
 
     conditions.forEach((condition) => {
       it(`should build - ${JSON.stringify(condition.output)}`, () => {
-        expect(mongo.conditionBuilder(condition.input)).toEqual([{ $match: condition.output }]);
+        expect(mongo.conditionBuilder(condition.input)).toEqual(condition.output);
       });
     });
   });
@@ -312,6 +327,31 @@ describe('adapter', () => {
   });
 
   describe('convertKey', () => {
+    it('should covert array of ids to objectId instances', () => {
+      const ids = [
+        '5d7cfb7e3725c1ab56b75522',
+        '5d7cfb7e3725c1ab56b75523',
+        '5d7cfb7e3725c1ab56b75524',
+      ];
+      expect(Mongo.convertKey(ids)).toEqual(ids.map((i) => new ObjectID(i)));
+    });
 
+    it('should covert string id to ObjectId', () => {
+      const id = '5d7cfb7e3725c1ab56b75522';
+
+      expect(Mongo.convertKey(id)).toEqual(new ObjectID(id));
+    });
+
+    describe('non ObjectId', () => {
+      it('should return id as is if id is not ObjectId string', () => {
+        const id = 'abcd';
+        expect(Mongo.convertKey(id)).toEqual('abcd');
+      });
+
+      it('should return id as is if id is not ObjectId string', () => {
+        const id = 10;
+        expect(Mongo.convertKey(id)).toEqual(10);
+      });
+    });
   });
 });
