@@ -34,6 +34,32 @@ describe('AbstractModelInstance - MongoDB', () => {
     });
   });
 
+  describe('setContext', () => {
+    let model;
+
+    beforeEach(() => {
+      model = new Model({});
+    });
+
+    it('should set correct context', () => {
+      model.setContext({ uuid: '1111' });
+      expect(model.context).toEqual({ uuid: '1111' });
+    });
+  });
+
+  describe('getContext', () => {
+    let model;
+
+    beforeEach(() => {
+      model = new Model({});
+    });
+
+    it('should get correct context', () => {
+      model.context = { uuid: '1111' };
+      expect(model.getContext()).toEqual({ uuid: '1111' });
+    });
+  });
+
   describe('getTableName', () => {
     let model = null;
 
@@ -42,7 +68,6 @@ describe('AbstractModelInstance - MongoDB', () => {
     });
 
     it('should only return table', () => {
-      Model.DATABASE = '';
       Model.TABLE = 'table1';
       expect(model.getTableName()).toBe('table1');
     });
@@ -494,6 +519,8 @@ describe('AbstractModelInstance - MongoDB', () => {
       new Model(output[0]),
       new Model(output[1]),
     ];
+    expectation[0].setOriginal(new Model(output[0]));
+    expectation[1].setOriginal(new Model(output[1]));
 
     beforeEach(() => {
       mongo = new Model({});

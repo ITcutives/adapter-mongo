@@ -266,9 +266,29 @@ describe('adapter', () => {
     });
   });
 
-  describe('DATABASE', () => {
-    it('should be empty string', () => {
-      expect(Mongo.DATABASE).toEqual('');
+  describe('setDatabase', () => {
+    let model;
+
+    beforeEach(() => {
+      model = new Mongo({});
+    });
+
+    it('should set correct database', () => {
+      model.setDatabase('mysql_0001_db');
+      expect(model.database).toBe('mysql_0001_db');
+    });
+  });
+
+  describe('getDatabase', () => {
+    let model;
+
+    beforeEach(() => {
+      model = new Mongo({});
+    });
+
+    it('should get correct database', () => {
+      model.database = 'mysql_0001_db';
+      expect(model.getDatabase()).toBe('mysql_0001_db');
     });
   });
 
