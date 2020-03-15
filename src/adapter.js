@@ -54,9 +54,9 @@ class Adapter extends AbstractAdapter {
 
   constructor(entity, context) {
     super();
-    // set everything to blank
-    this.setContext(context);
+    // set db name to blank
     this.setDatabase('');
+    this.setContext(context);
 
     // if entity object is provided
     if (entity) {
@@ -381,7 +381,7 @@ class Adapter extends AbstractAdapter {
       if ((fields && fields.indexOf(l.PLURAL) === -1) || (!fields && l.TYPE !== '1TO1')) {
         return;
       }
-      link = new Link(this, l, this.relationships);
+      link = new Link(this, l, this.relationships, this.getContext());
       promises.push(link.toLink(object, ModelPath));
     });
     if (promises.length > 0) {
@@ -392,7 +392,7 @@ class Adapter extends AbstractAdapter {
     return this.properties;
   }
 
-  static async fromLink(ClassConstructor, object) {
+  static async fromLink(ClassConstructor, context, object) {
     let link;
 
     const links = ClassConstructor.LINKS;
@@ -408,11 +408,9 @@ class Adapter extends AbstractAdapter {
       let results = await Promise.all(promises.map(reflect));
       results = results.filter((x) => x.status === 'resolved').map((x) => x.v);
       const result = Object.assign.apply({}, results);
-      // todo: assign context
-      return new ClassConstructor(result);
+      return new ClassConstructor(result, context);
     }
-    // todo: assign context
-    return new ClassConstructor(object);
+    return new ClassConstructor(object, context);
   }
 
   /**
