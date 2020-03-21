@@ -49,7 +49,7 @@ class Connection extends AbstractConnection {
     return conn.close()
       .then(() => {
         this.client = undefined;
-        this.connection = undefined;
+        this.connection = {};
         return true;
       });
   }

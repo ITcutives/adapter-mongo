@@ -198,7 +198,11 @@ class Adapter extends AbstractAdapter {
     if (Array.isArray(id)) {
       id = id.map((i) => new ObjectID(i));
     } else if (typeof id === 'string' && id.length === 24) {
-      id = new ObjectID(id);
+      try {
+        id = new ObjectID(id);
+      } catch(e) {
+        Adapter.debug(`${id} is not valid objectId`);
+      }
     }
     return id;
   }
