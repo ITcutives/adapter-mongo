@@ -86,6 +86,7 @@ describe('Connection', () => {
       const result = await obj.closeConnection();
       expect(close).toHaveBeenCalled();
       expect(result).toBe(true);
+      expect(obj.connection).toEqual({});
     });
   });
 });

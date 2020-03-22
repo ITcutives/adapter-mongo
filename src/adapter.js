@@ -200,7 +200,7 @@ class Adapter extends AbstractAdapter {
     } else if (typeof id === 'string' && id.length === 24) {
       try {
         id = new ObjectID(id);
-      } catch(e) {
+      } catch (e) {
         Adapter.debug(`${id} is not valid objectId`);
       }
     }

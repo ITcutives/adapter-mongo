@@ -372,6 +372,11 @@ describe('adapter', () => {
         const id = 10;
         expect(Mongo.convertKey(id)).toEqual(10);
       });
+
+      it('should return id as it is, when string is 24 length and cannot be converted to objectId', () => {
+        const id = 'ashish@somewebsite.com.i';
+        expect(Mongo.convertKey(id)).toEqual('ashish@somewebsite.com.i');
+      });
     });
   });
 });

@@ -976,22 +976,24 @@ describe('AbstractModelInstance - MongoDB', () => {
 
     it('should create class instance with correct fields populated from links object', async () => {
       const expectation = new Model({ id: 1, name: 'test', plan_id: 3 });
+      expectation.setContext({ uuid: '1111' });
       expectation.relationships = {
         plans: 3,
         relatives: [300],
       };
-      const result = await Model.fromLink(Model, object);
+      const result = await Model.fromLink(Model, { uuid: '1111' }, object);
       expect(result).toEqual(expectation);
     });
 
     it('should just create class instance without links populated if there is no links field', async () => {
       Model.LINKS = [];
       const expectation = new Model({ id: 1, name: 'test' });
+      expectation.setContext({ uuid: '1111' });
       expectation.relationships = {
         plans: 3,
         relatives: [300],
       };
-      const result = await Model.fromLink(Model, object);
+      const result = await Model.fromLink(Model, { uuid: '1111' }, object);
       expect(result).toEqual(expectation);
     });
   });
