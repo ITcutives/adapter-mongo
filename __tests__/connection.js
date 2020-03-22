@@ -24,6 +24,28 @@ describe('Connection', () => {
 
     beforeEach(() => {
       obj = new Connection({ db: 'test' });
+      obj.getClient = jest.fn().mockResolvedValue({ db: () => ({ connected: 'Connection' }) });
+    });
+
+    it('should call MongoClient.connect if it is not already connected', async () => {
+      const connection = await obj.openConnection();
+      expect(obj.getClient).toHaveBeenCalled();
+      expect(connection).toEqual({ connected: 'Connection' });
+    });
+
+    it('should return connection if it is already connected', async () => {
+      obj.connection.test = { connected: 'Connection' };
+      const connection = await obj.openConnection();
+      expect(connection).toEqual({ connected: 'Connection' });
+      expect(obj.getClient).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('getClient', () => {
+    let obj;
+
+    beforeEach(() => {
+      obj = new Connection({ db: 'test' });
     });
 
     afterEach(() => {
@@ -31,17 +53,17 @@ describe('Connection', () => {
     });
 
     it('should call MongoClient.connect if it is not already connected', async () => {
-      const db = jest.fn().mockReturnValue({ connected: 'Connection' });
-      MongoClient.connect.mockResolvedValue({ db });
-      const connection = await obj.openConnection();
-      expect(db).toHaveBeenCalledWith('test');
-      expect(connection).toEqual({ connected: 'Connection' });
+      const cl = { client: { connected: 'Connection' } };
+      MongoClient.connect.mockResolvedValue(cl);
+
+      const client = await obj.getClient();
+      expect(client).toEqual(cl);
     });
 
     it('should return connection if it is already connected', async () => {
-      obj.connection = { connected: 'Connection' };
-      const connection = await obj.openConnection();
-      expect(connection).toEqual({ connected: 'Connection' });
+      obj.client = { connected: 'Connection' };
+      const client = await obj.getClient();
+      expect(client).toEqual({ connected: 'Connection' });
       expect(MongoClient.connect).not.toHaveBeenCalled();
     });
   });
@@ -64,6 +86,7 @@ describe('Connection', () => {
       const result = await obj.closeConnection();
       expect(close).toHaveBeenCalled();
       expect(result).toBe(true);
+      expect(obj.connection).toEqual({});
     });
   });
 });

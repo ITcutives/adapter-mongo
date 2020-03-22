@@ -21,8 +21,9 @@ class Link {
    * @param db
    * @param link
    * @param relationships
+   * @param context
    */
-  constructor(db, link, relationships = {}) {
+  constructor(db, link, relationships = {}, context) {
     this.db = db;
 
     this.type = link.TYPE;
@@ -32,6 +33,7 @@ class Link {
     this.child = link.CHILD;
     this.join = link.JOIN;
     this.relationships = relationships;
+    this.context = context;
   }
 
   async toLink(object, ModelPath) {
@@ -78,14 +80,16 @@ class Link {
     const condition = {
       [this.link]: object.id,
     };
-    const Cls = require(`${ModelPath}/models/${this.plural}`);
-    const o = new Cls();
+    const ClassConstructor = require(`${ModelPath}/models/${this.plural}`);
 
-    if (this.relationships[o.getTableName()]) {
-      object.links[this.plural] = this.relationships[o.getTableName()];
+    if (this.relationships[ClassConstructor.TABLE]) {
+      object.links[this.plural] = this.relationships[ClassConstructor.TABLE];
       return object;
     }
-    const rec = await o.SELECT(condition, 'id');
+
+    const classInstance = new ClassConstructor();
+    classInstance.setContext(this.context);
+    const rec = await classInstance.SELECT(condition, 'id');
     object.links[this.plural] = rec.map((v) => v.get('id'));
     return object;
   }

@@ -266,9 +266,29 @@ describe('adapter', () => {
     });
   });
 
-  describe('DATABASE', () => {
-    it('should be empty string', () => {
-      expect(Mongo.DATABASE).toEqual('');
+  describe('setDatabase', () => {
+    let model;
+
+    beforeEach(() => {
+      model = new Mongo({});
+    });
+
+    it('should set correct database', () => {
+      model.setDatabase('mysql_0001_db');
+      expect(model.database).toBe('mysql_0001_db');
+    });
+  });
+
+  describe('getDatabase', () => {
+    let model;
+
+    beforeEach(() => {
+      model = new Mongo({});
+    });
+
+    it('should get correct database', () => {
+      model.database = 'mysql_0001_db';
+      expect(model.getDatabase()).toBe('mysql_0001_db');
     });
   });
 
@@ -351,6 +371,11 @@ describe('adapter', () => {
       it('should return id as is if id is not ObjectId string', () => {
         const id = 10;
         expect(Mongo.convertKey(id)).toEqual(10);
+      });
+
+      it('should return id as it is, when string is 24 length and cannot be converted to objectId', () => {
+        const id = 'ashish@somewebsite.com.i';
+        expect(Mongo.convertKey(id)).toEqual('ashish@somewebsite.com.i');
       });
     });
   });

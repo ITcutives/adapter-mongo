@@ -5,22 +5,6 @@ const Adapter = require('../../src/adapter');
 
 class Model extends Adapter {
   /**
-   * @return {string}
-   */
-  static get DATABASE() {
-    return Model.database;
-  }
-
-  /**
-   *
-   * @param {string} d
-   * @constructor
-   */
-  static set DATABASE(d) {
-    Model.database = d;
-  }
-
-  /**
    * @returns {{}}
    */
   static get SERIALIZED() {

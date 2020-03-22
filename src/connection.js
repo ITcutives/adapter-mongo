@@ -9,18 +9,32 @@ class Connection extends AbstractConnection {
     return 'MONGO';
   }
 
+  constructor(config) {
+    super(config);
+    this.connection = {};
+  }
+
   /**
    * @returns {Promise<*>}
    */
-  async openConnection() {
-    if (this.connection) {
-      return this.connection;
+  async openConnection(db) {
+    const database = db || this.config.db;
+    if (this.connection[database]) {
+      return this.connection[database];
     }
-    return MongoClient.connect(this.config.url)
+    const client = await this.getClient();
+    this.connection[database] = client.db(database);
+    return this.connection[database];
+  }
+
+  getClient() {
+    if (this.client) {
+      return this.client;
+    }
+    return MongoClient.connect(this.config.url, { useNewUrlParser: true, useUnifiedTopology: true })
       .then((client) => {
         this.client = client;
-        this.connection = client.db(this.config.db);
-        return this.connection;
+        return this.client;
       });
   }
 
@@ -35,7 +49,7 @@ class Connection extends AbstractConnection {
     return conn.close()
       .then(() => {
         this.client = undefined;
-        this.connection = undefined;
+        this.connection = {};
         return true;
       });
   }

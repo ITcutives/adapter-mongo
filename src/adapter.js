@@ -18,13 +18,6 @@ class Adapter extends AbstractAdapter {
   }
 
   /**
-   * @return {string}
-   */
-  static get DATABASE() {
-    return '';
-  }
-
-  /**
    * @return {{}}
    */
   static get SERIALIZED() {
@@ -59,8 +52,13 @@ class Adapter extends AbstractAdapter {
     return [];
   }
 
-  constructor(entity) {
+  constructor(entity, context) {
     super();
+    // set db name to blank
+    this.setDatabase('');
+    this.setContext(context);
+
+    // if entity object is provided
     if (entity) {
       loForEach(entity, (v, field) => {
         if (this.constructor.FIELDS.indexOf(field) !== -1) {
@@ -75,6 +73,28 @@ class Adapter extends AbstractAdapter {
 
       this.relationships = entity[Adapter.LINKELEMENT] || {};
     }
+  }
+
+  setContext(context) {
+    this.context = context;
+  }
+
+  getContext() {
+    return this.context;
+  }
+
+  /**
+   * @return {string}
+   */
+  getDatabase() {
+    return this.database;
+  }
+
+  /**
+   * @return {string}
+   */
+  setDatabase(db) {
+    this.database = db;
   }
 
   async serialise() {
@@ -109,6 +129,63 @@ class Adapter extends AbstractAdapter {
     return this;
   }
 
+
+  /**
+   *
+   * @param select [] | * | ""
+   * @returns {*}
+   */
+  static getSelectFields(select = '*') {
+    let selected;
+    // check fields
+    if (Array.isArray(select)) {
+      selected = {};
+      select.forEach((s) => {
+        selected[s] = 1;
+      });
+    } else if (loIsEmpty(select) || select === '*') {
+      // default value
+      selected = undefined;
+    } else {
+      selected = { [select]: 1 };
+    }
+    return selected;
+  }
+
+  /**
+   *
+   * @param order
+   * @returns {*}
+   */
+  static getOrderByFields(order = []) {
+    if (!order || order.length <= 0) {
+      return {};
+    }
+    const orderBy = {};
+    // order
+    if (Array.isArray(order) === true) {
+      order.forEach((o) => {
+        if (o.indexOf('-') === 0) {
+          orderBy[o.substr(1)] = -1;
+        } else {
+          orderBy[o] = 1;
+        }
+      });
+    } else if (typeof order === 'object') {
+      loForEach(order, (value, key) => {
+        if (value.toLowerCase() === 'desc') {
+          orderBy[key] = -1;
+        } else {
+          orderBy[key] = 1;
+        }
+      });
+    } else {
+      orderBy[order] = 1;
+    }
+
+    return orderBy;
+  }
+
   static isIdField(field) {
     return (field === 'id' || field.indexOf('_id') !== -1);
   }
@@ -121,7 +198,11 @@ class Adapter extends AbstractAdapter {
     if (Array.isArray(id)) {
       id = id.map((i) => new ObjectID(i));
     } else if (typeof id === 'string' && id.length === 24) {
-      id = new ObjectID(id);
+      try {
+        id = new ObjectID(id);
+      } catch (e) {
+        Adapter.debug(`${id} is not valid objectId`);
+      }
     }
     return id;
   }
@@ -220,6 +301,7 @@ class Adapter extends AbstractAdapter {
             if (cond.value.class) {
               const ClassConstructor = cond.value.class;
               const instance = new ClassConstructor();
+              instance.setContext(this.getContext());
               parentTable = instance.getTableName();
             } else if (cond.value.table) {
               // eslint-disable-next-line prefer-destructuring
@@ -292,40 +374,6 @@ class Adapter extends AbstractAdapter {
     return final;
   }
 
-  /**
-   *
-   * @param order
-   * @returns {*}
-   */
-  static getOrderByFields(order = []) {
-    if (!order || order.length <= 0) {
-      return {};
-    }
-    const orderBy = {};
-    // order
-    if (Array.isArray(order) === true) {
-      order.forEach((o) => {
-        if (o.indexOf('-') === 0) {
-          orderBy[o.substr(1)] = -1;
-        } else {
-          orderBy[o] = 1;
-        }
-      });
-    } else if (typeof order === 'object') {
-      loForEach(order, (value, key) => {
-        if (value.toLowerCase() === 'desc') {
-          orderBy[key] = -1;
-        } else {
-          orderBy[key] = 1;
-        }
-      });
-    } else {
-      orderBy[order] = 1;
-    }
-
-    return orderBy;
-  }
-
   async toLink(fields, ModelPath) {
     let link;
     const links = this.constructor.LINKS;
@@ -337,7 +385,7 @@ class Adapter extends AbstractAdapter {
       if ((fields && fields.indexOf(l.PLURAL) === -1) || (!fields && l.TYPE !== '1TO1')) {
         return;
       }
-      link = new Link(this, l, this.relationships);
+      link = new Link(this, l, this.relationships, this.getContext());
       promises.push(link.toLink(object, ModelPath));
     });
     if (promises.length > 0) {
@@ -348,10 +396,10 @@ class Adapter extends AbstractAdapter {
     return this.properties;
   }
 
-  static async fromLink(Cls, object) {
+  static async fromLink(ClassConstructor, context, object) {
     let link;
 
-    const links = Cls.LINKS;
+    const links = ClassConstructor.LINKS;
     const promises = [];
     const o = new Adapter();
 
@@ -364,31 +412,9 @@ class Adapter extends AbstractAdapter {
       let results = await Promise.all(promises.map(reflect));
       results = results.filter((x) => x.status === 'resolved').map((x) => x.v);
       const result = Object.assign.apply({}, results);
-      return new Cls(result);
+      return new ClassConstructor(result, context);
     }
-    return new Cls(object);
-  }
-
-  /**
-   *
-   * @param select [] | * | ""
-   * @returns {*}
-   */
-  static getSelectFields(select = '*') {
-    let selected;
-    // check fields
-    if (Array.isArray(select)) {
-      selected = {};
-      select.forEach((s) => {
-        selected[s] = 1;
-      });
-    } else if (loIsEmpty(select) || select === '*') {
-      // default value
-      selected = undefined;
-    } else {
-      selected = { [select]: 1 };
-    }
-    return selected;
+    return new ClassConstructor(object, context);
   }
 
   /**
@@ -428,7 +454,7 @@ class Adapter extends AbstractAdapter {
     }
 
     Adapter.debug(JSON.stringify(query));
-    const connection = await Adapter.CONN.openConnection();
+    const connection = await Adapter.CONN.openConnection(this.getDatabase());
     return connection.collection(table).aggregate(query).toArray();
   }
 
@@ -445,8 +471,12 @@ class Adapter extends AbstractAdapter {
     const table = this.getTableName();
     limit = limit || this.constructor.PAGESIZE;
     const result = await this.query(table, condition, select, order, from, limit);
-    const Cls = this.constructor;
-    return Promise.all(result.map((v) => new Cls(v)).map((v) => v.deserialise()));
+    const ClassConstructor = this.constructor;
+    const deserialised = await Promise.all(result.map((v) => new ClassConstructor(v, this.getContext())).map((v) => v.deserialise()));
+    return deserialised.map((v) => {
+      v.setOriginal(new ClassConstructor(loClone(v.properties)));
+      return v;
+    });
   }
 
   /**
@@ -458,7 +488,7 @@ class Adapter extends AbstractAdapter {
     }
 
     await this.serialise();
-    const connection = await Adapter.CONN.openConnection();
+    const connection = await Adapter.CONN.openConnection(this.getDatabase());
     const table = this.getTableName();
     Adapter.debug('INSERT:', JSON.stringify(this.properties));
     return connection.collection(table).insert(this.properties).then((r) => r.insertedIds['0']);
@@ -511,7 +541,7 @@ class Adapter extends AbstractAdapter {
 
     condition = this.conditionBuilder(condition)[0].$match;
     Adapter.debug('UPDATE:', JSON.stringify({ condition, changes: chg }));
-    const connection = await Adapter.CONN.openConnection();
+    const connection = await Adapter.CONN.openConnection(this.getDatabase());
     const table = this.getTableName();
     return connection.collection(table).updateOne(condition, chg).then((result) => result.result.nModified > 0);
   }
@@ -532,7 +562,7 @@ class Adapter extends AbstractAdapter {
 
     condition = this.conditionBuilder(condition)[0].$match;
     const table = this.getTableName();
-    const connection = await Adapter.CONN.openConnection();
+    const connection = await Adapter.CONN.openConnection(this.getDatabase());
     return connection.collection(table).deleteOne(condition).then((result) => result.deleteCount > 0);
   }
 
