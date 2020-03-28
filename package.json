@@ -1,6 +1,6 @@
 {
   "name": "@itcutives/adapter-mongo",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "description": "MongoDB Adapter for ITcutives API",
   "main": "index.js",
   "scripts": {
@@ -29,10 +29,10 @@
     "eslint": "^6.8.0",
     "eslint-config-airbnb-base": "^14.1.0",
     "eslint-plugin-import": "^2.20.1",
-    "jest": "^25.1.0"
+    "jest": "^25.2.3"
   },
   "dependencies": {
-    "@itcutives/adapter-memory": "^1.0.1",
+    "@itcutives/adapter-memory": "^1.1.0",
     "boom": "^7.3.0",
     "lodash": "^4.17.15",
     "mongodb": "^3.5.5"
