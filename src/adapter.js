@@ -97,15 +97,15 @@ class Adapter extends AbstractAdapter {
     this.database = db;
   }
 
-  async processSerialised(key, value) {
-    if (this.constructor.SERIALIZED[key] === 'objectId') {
+  processSerialised(field, value) {
+    if (this.constructor.SERIALIZED[field] === 'objectId') {
       if (Array.isArray(value)) {
         value = value.map((v) => new ObjectID(v));
       } else {
         value = new ObjectID(value);
       }
     }
-    return { key, value };
+    return { field, value };
   }
 
   async serialise() {
@@ -283,9 +283,9 @@ class Adapter extends AbstractAdapter {
         cond.value = Adapter.convertKey(cond.value);
         cond.field = Adapter.fixIdField(cond.field);
       } else {
-        const { k, v } = this.processSerialised(cond.field, cond.value);
-        cond.field = k;
-        cond.value = v;
+        const { field, value } = this.processSerialised(cond.field, cond.value);
+        cond.field = field;
+        cond.value = value;
       }
 
       where = { [cond.field]: {} };
