@@ -97,6 +97,17 @@ class Adapter extends AbstractAdapter {
     this.database = db;
   }
 
+  async processSerialised(key, value) {
+    if (this.constructor.SERIALIZED[key] === 'objectId') {
+      if (Array.isArray(value)) {
+        value = value.map((v) => new ObjectID(v));
+      } else {
+        value = new ObjectID(value);
+      }
+    }
+    return { key, value };
+  }
+
   async serialise() {
     loForEach(this.constructor.SERIALIZED, (v, k) => {
       let value = this.get(k);
@@ -271,6 +282,10 @@ class Adapter extends AbstractAdapter {
       if (Adapter.isIdField(cond.field)) {
         cond.value = Adapter.convertKey(cond.value);
         cond.field = Adapter.fixIdField(cond.field);
+      } else {
+        const { k, v } = this.processSerialised(cond.field, cond.value);
+        cond.field = k;
+        cond.value = v;
       }
 
       where = { [cond.field]: {} };
@@ -453,7 +468,7 @@ class Adapter extends AbstractAdapter {
       query.push({ $limit: limit });
     }
 
-    Adapter.debug(JSON.stringify(query));
+    Adapter.debug(JSON.stringify(query), table);
     const connection = await Adapter.CONN.openConnection(this.getDatabase());
     return connection.collection(table).aggregate(query).toArray();
   }
@@ -473,6 +488,7 @@ class Adapter extends AbstractAdapter {
     const result = await this.query(table, condition, select, order, from, limit);
     const ClassConstructor = this.constructor;
     const deserialised = await Promise.all(result.map((v) => new ClassConstructor(v, this.getContext())).map((v) => v.deserialise()));
+    Adapter.debug(`Found ${deserialised.length} records.`);
     return deserialised.map((v) => {
       v.setOriginal(new ClassConstructor(loClone(v.properties)));
       return v;
@@ -491,7 +507,7 @@ class Adapter extends AbstractAdapter {
     const connection = await Adapter.CONN.openConnection(this.getDatabase());
     const table = this.getTableName();
     Adapter.debug('INSERT:', JSON.stringify(this.properties));
-    return connection.collection(table).insert(this.properties).then((r) => r.insertedIds['0']);
+    return connection.collection(table).insertOne(this.properties).then((r) => r.insertedIds['0']);
   }
 
   /**
