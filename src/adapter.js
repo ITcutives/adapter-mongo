@@ -6,6 +6,7 @@ const loForEach = require('lodash/forEach');
 const loIsEmpty = require('lodash/isEmpty');
 const loReduce = require('lodash/reduce');
 const loClone = require('lodash/clone');
+const loGet = require('lodash/get');
 const { ObjectID } = require('mongodb');
 const AbstractAdapter = require('@itcutives/adapter-memory/src/abstract');
 const Link = require('./link');
@@ -60,15 +61,17 @@ class Adapter extends AbstractAdapter {
 
     // if entity object is provided
     if (entity) {
-      loForEach(entity, (v, field) => {
-        if (this.constructor.FIELDS.indexOf(field) !== -1) {
-          this.properties[field] = v;
+      this.constructor.FIELDS.forEach((field) => {
+        const value = loGet(entity, field);
+        if (value) {
+          this.set(field, value);
         }
       });
+
       // eslint-disable-next-line no-underscore-dangle
       if (entity._id && !entity.id) {
         // eslint-disable-next-line no-underscore-dangle
-        this.properties.id = entity._id;
+        this.set('id', entity._id);
       }
 
       this.relationships = entity[Adapter.LINKELEMENT] || {};

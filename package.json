@@ -26,15 +26,15 @@
   },
   "homepage": "https://github.com/ITcutives/adapter-mongo#readme",
   "devDependencies": {
-    "eslint": "^6.8.0",
+    "eslint": "^7.1.0",
     "eslint-config-airbnb-base": "^14.1.0",
-    "eslint-plugin-import": "^2.20.1",
-    "jest": "^25.2.3"
+    "eslint-plugin-import": "^2.20.2",
+    "jest": "^26.0.1"
   },
   "dependencies": {
-    "@itcutives/adapter-memory": "^1.1.0",
+    "@itcutives/adapter-memory": "^1.2.0",
     "boom": "^7.3.0",
     "lodash": "^4.17.15",
-    "mongodb": "^3.5.5"
+    "mongodb": "^3.5.8"
   }
 }
