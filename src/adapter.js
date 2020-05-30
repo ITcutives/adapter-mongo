@@ -6,6 +6,7 @@ const loForEach = require('lodash/forEach');
 const loIsEmpty = require('lodash/isEmpty');
 const loReduce = require('lodash/reduce');
 const loClone = require('lodash/clone');
+const loGet = require('lodash/get');
 const { ObjectID } = require('mongodb');
 const AbstractAdapter = require('@itcutives/adapter-memory/src/abstract');
 const Link = require('./link');
@@ -60,15 +61,17 @@ class Adapter extends AbstractAdapter {
 
     // if entity object is provided
     if (entity) {
-      loForEach(entity, (v, field) => {
-        if (this.constructor.FIELDS.indexOf(field) !== -1) {
-          this.properties[field] = v;
+      this.constructor.FIELDS.forEach((field) => {
+        const value = loGet(entity, field);
+        if (value) {
+          this.set(field, value);
         }
       });
+
       // eslint-disable-next-line no-underscore-dangle
       if (entity._id && !entity.id) {
         // eslint-disable-next-line no-underscore-dangle
-        this.properties.id = entity._id;
+        this.set('id', entity._id);
       }
 
       this.relationships = entity[Adapter.LINKELEMENT] || {};
@@ -95,6 +98,17 @@ class Adapter extends AbstractAdapter {
    */
   setDatabase(db) {
     this.database = db;
+  }
+
+  processSerialised(field, value) {
+    if (this.constructor.SERIALIZED[field] === 'objectId') {
+      if (Array.isArray(value)) {
+        value = value.map((v) => new ObjectID(v));
+      } else {
+        value = new ObjectID(value);
+      }
+    }
+    return { field, value };
   }
 
   async serialise() {
@@ -271,6 +285,10 @@ class Adapter extends AbstractAdapter {
       if (Adapter.isIdField(cond.field)) {
         cond.value = Adapter.convertKey(cond.value);
         cond.field = Adapter.fixIdField(cond.field);
+      } else {
+        const { field, value } = this.processSerialised(cond.field, cond.value);
+        cond.field = field;
+        cond.value = value;
       }
 
       where = { [cond.field]: {} };
@@ -453,7 +471,7 @@ class Adapter extends AbstractAdapter {
       query.push({ $limit: limit });
     }
 
-    Adapter.debug(JSON.stringify(query));
+    Adapter.debug(JSON.stringify(query), table);
     const connection = await Adapter.CONN.openConnection(this.getDatabase());
     return connection.collection(table).aggregate(query).toArray();
   }
@@ -473,6 +491,7 @@ class Adapter extends AbstractAdapter {
     const result = await this.query(table, condition, select, order, from, limit);
     const ClassConstructor = this.constructor;
     const deserialised = await Promise.all(result.map((v) => new ClassConstructor(v, this.getContext())).map((v) => v.deserialise()));
+    Adapter.debug(`Found ${deserialised.length} records.`);
     return deserialised.map((v) => {
       v.setOriginal(new ClassConstructor(loClone(v.properties)));
       return v;
@@ -491,7 +510,7 @@ class Adapter extends AbstractAdapter {
     const connection = await Adapter.CONN.openConnection(this.getDatabase());
     const table = this.getTableName();
     Adapter.debug('INSERT:', JSON.stringify(this.properties));
-    return connection.collection(table).insert(this.properties).then((r) => r.insertedIds['0']);
+    return connection.collection(table).insertOne(this.properties).then((r) => r.insertedIds['0']);
   }
 
   /**

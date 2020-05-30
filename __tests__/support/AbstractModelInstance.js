@@ -3,7 +3,7 @@
  */
 const path = require('path');
 const { ObjectID } = require('mongodb');
-const loClone = require('lodash/clone');
+const loCloneDeep = require('lodash/cloneDeep');
 const Model = require('../models/model');
 
 describe('AbstractModelInstance - MongoDB', () => {
@@ -131,6 +131,33 @@ describe('AbstractModelInstance - MongoDB', () => {
       expect(model.get('a')).toBe(10);
     });
   });
+
+  describe('processSerialised', () => {
+    let model;
+
+    beforeEach(() => {
+      model = new Model({});
+    });
+
+    it('should return field and value as it is if field is not in serialised list', () => {
+      expect(model.processSerialised('name', 'ashish')).toEqual({ field: 'name', value: 'ashish' });
+    });
+
+    it('should return field and serialised value (objectId)', () => {
+      expect(model.processSerialised('objectIdField', '5d4aae08f61692ad5f01294d')).toEqual({
+        field: 'objectIdField',
+        value: new ObjectID('5d4aae08f61692ad5f01294d'),
+      });
+    });
+
+    it('should return field and serialised value (array of objectId)', () => {
+      expect(model.processSerialised('objectIdField', ['5d4aae08f61692ad5f01294d', '5d4ab4c9f61692ad5f01294e'])).toEqual({
+        field: 'objectIdField',
+        value: [new ObjectID('5d4aae08f61692ad5f01294d'), new ObjectID('5d4ab4c9f61692ad5f01294e')],
+      });
+    });
+  });
+
 
   describe('conditionBuilder', () => {
     let mongo;
@@ -578,7 +605,7 @@ describe('AbstractModelInstance - MongoDB', () => {
 
     beforeEach(() => {
       conn = {
-        insert: jest.fn(),
+        insertOne: jest.fn(),
         collection: jest.fn(),
       };
       conn.collection.mockReturnValue(conn);
@@ -588,23 +615,23 @@ describe('AbstractModelInstance - MongoDB', () => {
     });
 
     it('insert operation responds success', async () => {
-      conn.insert.mockResolvedValue({ insertedIds: ['5d7c67fd217ffe92f90b1b1b'] });
+      conn.insertOne.mockResolvedValue({ insertedIds: ['5d7c67fd217ffe92f90b1b1b'] });
       Model.TABLE = 'table';
       mongo.set('a', 1);
       mongo.set('b', 2);
       await expect(mongo.INSERT()).resolves.toEqual('5d7c67fd217ffe92f90b1b1b');
-      expect(conn.insert).toHaveBeenCalledWith({ a: 1, b: 2 });
+      expect(conn.insertOne).toHaveBeenCalledWith({ a: 1, b: 2 });
       expect(conn.collection).toHaveBeenCalledWith('table');
     });
 
     it('insert operation throws exception', async () => {
       const err = new Error('mongo insert error');
-      conn.insert.mockRejectedValue(err);
+      conn.insertOne.mockRejectedValue(err);
       Model.TABLE = 'table2';
       mongo.set('a', 1);
       mongo.set('b', 2);
       await expect(mongo.INSERT()).rejects.toEqual(err);
-      expect(conn.insert).toHaveBeenCalledWith({ a: 1, b: 2 });
+      expect(conn.insertOne).toHaveBeenCalledWith({ a: 1, b: 2 });
       expect(conn.collection).toHaveBeenCalledWith('table2');
     });
 
@@ -637,7 +664,7 @@ describe('AbstractModelInstance - MongoDB', () => {
         },
       };
       mongo = new Model(object);
-      mongo.setOriginal(new Model({ ...object }));
+      mongo.setOriginal(new Model(loCloneDeep(object)));
     });
 
     it('should throw error if original is not set', async () => {
@@ -668,16 +695,12 @@ describe('AbstractModelInstance - MongoDB', () => {
       Model.TABLE = 'table3';
       mongo.set('a', { $inc: { a: 1 } });
       mongo.set('b', { $inc: { b: 11 } });
-      mongo.set('jsonField', {
-        address: { street: '21b baker steet', postcode: 222 },
-      });
+      mongo.set('jsonField.address.postcode', 222);
       await expect(mongo.UPDATE()).resolves.toEqual(true);
       expect(conn.updateOne).toHaveBeenCalledWith({ _id: new ObjectID(object.id) }, {
         $inc: { a: 1, b: 11 },
         $set: {
-          jsonField: {
-            address: { street: '21b baker steet', postcode: 222 },
-          },
+          'jsonField.address.postcode': 222,
         },
       });
       expect(conn.collection).toHaveBeenCalledWith('table3');
@@ -763,7 +786,7 @@ describe('AbstractModelInstance - MongoDB', () => {
         a: 10,
         objectIdField: '5d7c67fd217ffe92f90b1b1b',
       };
-      const expectation = loClone(props);
+      const expectation = loCloneDeep(props);
       expectation.objectIdField = new ObjectID(expectation.objectIdField);
       model = new Model(props);
       await model.serialise();
@@ -799,7 +822,7 @@ describe('AbstractModelInstance - MongoDB', () => {
         a: 10,
         objectIdField: '5d7c67fd217ffe92f90b1b1b',
       };
-      const props = loClone(expectation);
+      const props = loCloneDeep(expectation);
       props.objectIdField = new ObjectID(props.objectIdField);
       model = new Model(props);
       await model.deserialise();
