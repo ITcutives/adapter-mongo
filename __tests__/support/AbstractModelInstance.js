@@ -158,7 +158,6 @@ describe('AbstractModelInstance - MongoDB', () => {
     });
   });
 
-
   describe('conditionBuilder', () => {
     let mongo;
     const conditions = [
@@ -615,7 +614,7 @@ describe('AbstractModelInstance - MongoDB', () => {
     });
 
     it('insert operation responds success', async () => {
-      conn.insertOne.mockResolvedValue({ insertedIds: ['5d7c67fd217ffe92f90b1b1b'] });
+      conn.insertOne.mockResolvedValue({ insertedId: '5d7c67fd217ffe92f90b1b1b' });
       Model.TABLE = 'table';
       mongo.set('a', 1);
       mongo.set('b', 2);

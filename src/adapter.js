@@ -63,7 +63,7 @@ class Adapter extends AbstractAdapter {
     if (entity) {
       this.constructor.FIELDS.forEach((field) => {
         const value = loGet(entity, field);
-        if (value) {
+        if (value !== undefined) {
           this.set(field, value);
         }
       });
@@ -143,6 +143,16 @@ class Adapter extends AbstractAdapter {
     return this;
   }
 
+  getChanges() {
+    const changes = {};
+    this.constructor.FIELDS.forEach((field) => {
+      const currentValue = this.get(field);
+      if (currentValue !== undefined && this.original && currentValue !== this.original.get(field)) {
+        changes[field] = currentValue;
+      }
+    });
+    return changes;
+  }
 
   /**
    *
@@ -510,7 +520,7 @@ class Adapter extends AbstractAdapter {
     const connection = await Adapter.CONN.openConnection(this.getDatabase());
     const table = this.getTableName();
     Adapter.debug('INSERT:', JSON.stringify(this.properties));
-    return connection.collection(table).insertOne(this.properties).then((r) => r.insertedIds['0']);
+    return connection.collection(table).insertOne(this.properties).then((r) => r.insertedId);
   }
 
   /**
