@@ -120,6 +120,9 @@ class Adapter extends AbstractAdapter {
           case 'objectId':
             value = new ObjectID(value);
             break;
+          case 'jsonString':
+            value = JSON.stringify(value);
+            break;
         }
         this.properties[k] = value;
       }
@@ -135,6 +138,9 @@ class Adapter extends AbstractAdapter {
         switch (v) {
           case 'objectId':
             value = value.toString();
+            break;
+          case 'jsonString':
+            value = JSON.parse(value);
             break;
         }
         this.properties[k] = value;
