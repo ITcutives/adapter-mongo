@@ -598,6 +598,150 @@ describe('AbstractModelInstance - MongoDB', () => {
     });
   });
 
+  describe('COUNT', () => {
+    let mongo;
+    let conn;
+    const sampleCondition = { a: 1, b: '2' };
+    const sampleCondition2 = [{
+      field: 'id',
+      operator: 'in',
+      value: {
+        class: require('../models/relatives'),
+        select: 'a_id',
+        condition: { a_id: 'abc' },
+      },
+    }];
+
+    beforeEach(() => {
+      mongo = new Model({});
+
+      conn = {
+        aggregate: jest.fn(),
+        collection: jest.fn(),
+        toArray: jest.fn(),
+      };
+      conn.collection.mockReturnValue(conn);
+      conn.aggregate.mockReturnValue(conn);
+
+      Model.CONN = {};
+      Model.CONN.openConnection = jest.fn().mockResolvedValue(conn);
+    });
+
+    it('should count all rows of table', async () => {
+      conn.toArray.mockResolvedValue([{ _id: null, n: 500 }]);
+      Model.TABLE = 'table1';
+
+      await expect(mongo.COUNT()).resolves.toEqual(500);
+      expect(conn.aggregate).toHaveBeenCalledWith([{ $group: { _id: null, n: { $sum: 1 } } }]);
+      expect(conn.collection).toHaveBeenCalledWith('table1');
+    });
+
+    it('should count all records where it matches condition', async () => {
+      conn.toArray.mockResolvedValue([{ _id: null, n: 5 }]);
+      Model.TABLE = 'table2';
+
+      await expect(mongo.COUNT(sampleCondition)).resolves.toEqual(5);
+      expect(conn.aggregate).toHaveBeenCalledWith([{
+        $match: {
+          $and: [{ b: '2' }, { a: 1 }],
+        },
+      }, {
+        $group: {
+          _id: null,
+          n: { $sum: 1 },
+        },
+      }]);
+      expect(conn.collection).toHaveBeenCalledWith('table2');
+    });
+
+    it('should select some fields where it matches condition (m2m)', async () => {
+      conn.toArray.mockResolvedValue([{ _id: null, n: 5 }]);
+      Model.TABLE = 'table3';
+      await expect(mongo.COUNT(sampleCondition2)).resolves.toEqual(5);
+      expect(conn.aggregate).toHaveBeenCalledWith([
+        {
+          $lookup: {
+            from: 'related',
+            let: {
+              id: '$_id',
+            },
+            pipeline: [
+              {
+                $match: {
+                  $expr: {
+                    $and: [
+                      {
+                        $eq: [
+                          '$a_id',
+                          '$$id',
+                        ],
+                      },
+                    ],
+                  },
+                },
+              },
+            ],
+            as: 'links.related',
+          },
+        },
+        {
+          $match: {
+            'links.related': {
+              $elemMatch: {
+                a_id: 'abc',
+              },
+            },
+          },
+        },
+        {
+          $addFields: {
+            'links.related': {
+              $map: {
+                input: '$links.related',
+                as: 'el',
+                in: '$$el._id',
+              },
+            },
+          },
+        },
+        {
+          $group: {
+            _id: null,
+            n: {
+              $sum: 1,
+            },
+          },
+        },
+      ]);
+      expect(conn.collection).toHaveBeenCalledWith('table3');
+    });
+    //
+    it('should return 0 when query returns nothing', async () => {
+      conn.toArray.mockResolvedValue([]);
+      Model.TABLE = 'table4';
+      await expect(mongo.COUNT(sampleCondition)).resolves.toEqual(0);
+      expect(conn.aggregate).toHaveBeenCalledWith([{
+        $match: {
+          $and: [{ b: '2' }, { a: 1 }],
+        },
+      }, {
+        $group: {
+          _id: null,
+          n: { $sum: 1 },
+        },
+      }]);
+      expect(conn.collection).toHaveBeenCalledWith('table4');
+    });
+
+    it('query throws exception', async () => {
+      const err = new Error('mongo select error');
+      conn.toArray.mockRejectedValue(err);
+      Model.TABLE = 'table6';
+      await expect(mongo.COUNT(sampleCondition)).rejects.toEqual(err);
+      expect(conn.collection).toHaveBeenCalledWith('table6');
+    });
+  });
+
   describe('INSERT', () => {
     let mongo;
     let conn;
@@ -770,26 +914,58 @@ describe('AbstractModelInstance - MongoDB', () => {
       expect(model.properties).toEqual(props);
     });
 
-    it('should not modify serialised property', async () => {
-      const props = {
-        a: 10,
-        objectIdField: new ObjectID('5d7c67fd217ffe92f90b1b1b'),
-      };
-      model = new Model(props);
-      await model.serialise();
-      expect(model.properties).toEqual(props);
+    describe('objectId', () => {
+      it('should not modify serialised property', async () => {
+        const input = {
+          a: 10,
+          objectIdField: new ObjectID('5d7c67fd217ffe92f90b1b1b'),
+        };
+        model = new Model(input);
+        await model.serialise();
+        expect(model.properties).toEqual(input);
+      });
+
+      it('should convert property from string to objectId', async () => {
+        const input = {
+          a: 10,
+          objectIdField: '5d7c67fd217ffe92f90b1b1b',
+        };
+        const expectation = {
+          a: 10,
+          objectIdField: new ObjectID('5d7c67fd217ffe92f90b1b1b'),
+        };
+        model = new Model(input);
+        await model.serialise();
+        expect(model.properties).toEqual(expectation);
+      });
     });
 
-    it('should convert property from string to objectId', async () => {
-      const props = {
-        a: 10,
-        objectIdField: '5d7c67fd217ffe92f90b1b1b',
-      };
-      const expectation = loCloneDeep(props);
-      expectation.objectIdField = new ObjectID(expectation.objectIdField);
-      model = new Model(props);
-      await model.serialise();
-      expect(model.properties).toEqual(expectation);
+    describe('jsonString', () => {
+      it('should not modify serialised property', async () => {
+        const input = {
+          a: 10,
+          jsonStringField: '{"$schema":"#/test"}',
+        };
+        model = new Model(input);
+        await model.serialise();
+        expect(model.properties).toEqual(input);
+      });
+
+      it('should convert property from string to jsonString', async () => {
+        const input = {
+          a: 10,
+          jsonStringField: {
+            $schema: '#/test',
+          },
+        };
+        const expectation = {
+          a: 10,
+          jsonStringField: '{"$schema":"#/test"}',
+        };
+        model = new Model(input);
+        await model.serialise();
+        expect(model.properties).toEqual(expectation);
+      });
     });
   });
 
@@ -797,35 +973,69 @@ describe('AbstractModelInstance - MongoDB', () => {
     let model = null;
 
     it('should not make any difference if there is no property that needs deserialisation', async () => {
-      const props = {
+      const input = {
         a: 10,
         b: 20,
       };
-      model = new Model(props);
+      model = new Model(input);
       await model.deserialise();
-      expect(model.properties).toEqual(props);
+      expect(model.properties).toEqual(input);
     });
 
-    it('should not modify string', async () => {
-      const props = {
-        a: 10,
-        objectIdField: '5d7c67fd217ffe92f90b1b1b',
-      };
-      model = new Model(props);
-      await model.deserialise();
-      expect(model.properties).toEqual(props);
+    describe('objectId', () => {
+      it('should not modify string', async () => {
+        const input = {
+          a: 10,
+          objectIdField: '5d7c67fd217ffe92f90b1b1b',
+        };
+        model = new Model(input);
+        await model.deserialise();
+        expect(model.properties).toEqual(input);
+      });
+
+      it('should convert property from objectId to string', async () => {
+        const expectation = {
+          a: 10,
+          objectIdField: '5d7c67fd217ffe92f90b1b1b',
+        };
+        const input = {
+          a: 10,
+          objectIdField: new ObjectID('5d7c67fd217ffe92f90b1b1b'),
+        };
+        model = new Model(input);
+        await model.deserialise();
+        expect(model.properties).toEqual(expectation);
+      });
     });
 
-    it('should convert property from objectId to string', async () => {
-      const expectation = {
-        a: 10,
-        objectIdField: '5d7c67fd217ffe92f90b1b1b',
-      };
-      const props = loCloneDeep(expectation);
-      props.objectIdField = new ObjectID(props.objectIdField);
-      model = new Model(props);
-      await model.deserialise();
-      expect(model.properties).toEqual(expectation);
+    describe('jsonString', () => {
+      it('should not modify string', async () => {
+        const input = {
+          a: 10,
+          jsonStringField: {
+            $schema: '#/test',
+          },
+        };
+        model = new Model(input);
+        await model.deserialise();
+        expect(model.properties).toEqual(input);
+      });
+
+      it('should convert property from string to object', async () => {
+        const expectation = {
+          a: 10,
+          jsonStringField: {
+            $schema: '#/test',
+          },
+        };
+        const input = {
+          a: 10,
+          jsonStringField: '{"$schema":"#/test"}',
+        };
+        model = new Model(input);
+        await model.deserialise();
+        expect(model.properties).toEqual(expectation);
+      });
     });
   });
 
