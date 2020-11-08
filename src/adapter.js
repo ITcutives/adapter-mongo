@@ -121,7 +121,9 @@ class Adapter extends AbstractAdapter {
             value = new ObjectID(value);
             break;
           case 'jsonString':
-            value = JSON.stringify(value);
+            if (typeof value !== 'string') {
+              value = JSON.stringify(value);
+            }
             break;
         }
         this.properties[k] = value;
@@ -140,7 +142,9 @@ class Adapter extends AbstractAdapter {
             value = value.toString();
             break;
           case 'jsonString':
-            value = JSON.parse(value);
+            if (typeof value === 'string') {
+              value = JSON.parse(value);
+            }
             break;
         }
         this.properties[k] = value;
@@ -459,6 +463,15 @@ class Adapter extends AbstractAdapter {
     return this.constructor.TABLE;
   }
 
+  /**
+   * @param table
+   * @param condition
+   * @param select
+   * @param order
+   * @param from
+   * @param limit
+   * @returns {Promise<unknown>}
+   */
   async query(table, condition, select, order, from, limit) {
     condition = await this.conditionBuilder(condition);
     select = Adapter.getSelectFields(select);
@@ -512,6 +525,24 @@ class Adapter extends AbstractAdapter {
       v.setOriginal(new ClassConstructor(loClone(v.properties)));
       return v;
     });
+  }
+
+  async COUNT(condition) {
+    const table = this.getTableName();
+    condition = await this.conditionBuilder(condition);
+
+    let query = [];
+    if (!loIsEmpty(condition)) {
+      query = query.concat(condition);
+    }
+
+    query.push({ $group: { _id: null, n: { $sum: 1 } } });
+
+    Adapter.debug(JSON.stringify(query), table);
+    const connection = await Adapter.CONN.openConnection(this.getDatabase());
+    const result = await connection.collection(table).aggregate(query).toArray();
+    Adapter.debug(`Found ${result.length} records.`);
+    return loGet(result, '0.n', 0);
   }
 
   /**
