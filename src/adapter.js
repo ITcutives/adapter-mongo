@@ -516,7 +516,6 @@ class Adapter extends AbstractAdapter {
    */
   async SELECT(condition, select, order, from, limit) {
     const table = this.getTableName();
-    limit = limit || this.constructor.PAGESIZE;
     const result = await this.query(table, condition, select, order, from, limit);
     const ClassConstructor = this.constructor;
     const deserialised = await Promise.all(result.map((v) => new ClassConstructor(v, this.getContext())).map((v) => v.deserialise()));

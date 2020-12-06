@@ -523,6 +523,16 @@ describe('AbstractModelInstance - MongoDB', () => {
       expect(conn.collection).toHaveBeenCalledWith('table1');
     });
 
+    it('should run aggregate function without from and limit fields when from is not provided', async () => {
+      await expect(mongo.query('table1', condition, ['a', 'b'], ['a', '-b'], undefined, 100)).resolves.toEqual([object]);
+      expect(conn.aggregate).toHaveBeenCalledWith([
+        { $match: { a: '10' } },
+        { $project: { a: 1, b: 1 } },
+        { $sort: { a: 1, b: -1 } },
+      ]);
+      expect(conn.collection).toHaveBeenCalledWith('table1');
+    });
+
     it('should throw error when query fails to execute', async () => {
       const err = new Error('mongo aggregate error');
       conn.toArray.mockRejectedValue(err);
