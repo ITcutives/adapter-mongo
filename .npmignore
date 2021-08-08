@@ -1,0 +1,8 @@
+temp
+__tests__
+.eslintignore
+.eslitrc.js
+.gitignore
+.travis.yml
+jest.config.js
+*.iml
