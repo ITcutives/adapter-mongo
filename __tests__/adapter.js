@@ -1,4 +1,4 @@
-const { ObjectID } = require('mongodb');
+const { ObjectId } = require('mongodb');
 const Mongo = require('../src/adapter');
 
 describe('adapter', () => {
@@ -353,13 +353,13 @@ describe('adapter', () => {
         '5d7cfb7e3725c1ab56b75523',
         '5d7cfb7e3725c1ab56b75524',
       ];
-      expect(Mongo.convertKey(ids)).toEqual(ids.map((i) => new ObjectID(i)));
+      expect(Mongo.convertKey(ids)).toEqual(ids.map((i) => new ObjectId(i)));
     });
 
     it('should covert string id to ObjectId', () => {
       const id = '5d7cfb7e3725c1ab56b75522';
 
-      expect(Mongo.convertKey(id)).toEqual(new ObjectID(id));
+      expect(Mongo.convertKey(id)).toEqual(new ObjectId(id));
     });
 
     describe('non ObjectId', () => {

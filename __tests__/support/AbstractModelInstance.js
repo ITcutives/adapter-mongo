@@ -2,7 +2,7 @@
  * Created by ashish on 17/5/17.
  */
 const path = require('path');
-const { ObjectID } = require('mongodb');
+const { ObjectId } = require('mongodb');
 const loCloneDeep = require('lodash/cloneDeep');
 const Model = require('../models/model');
 
@@ -146,14 +146,14 @@ describe('AbstractModelInstance - MongoDB', () => {
     it('should return field and serialised value (objectId)', () => {
       expect(model.processSerialised('objectIdField', '5d4aae08f61692ad5f01294d')).toEqual({
         field: 'objectIdField',
-        value: new ObjectID('5d4aae08f61692ad5f01294d'),
+        value: new ObjectId('5d4aae08f61692ad5f01294d'),
       });
     });
 
     it('should return field and serialised value (array of objectId)', () => {
       expect(model.processSerialised('objectIdField', ['5d4aae08f61692ad5f01294d', '5d4ab4c9f61692ad5f01294e'])).toEqual({
         field: 'objectIdField',
-        value: [new ObjectID('5d4aae08f61692ad5f01294d'), new ObjectID('5d4ab4c9f61692ad5f01294e')],
+        value: [new ObjectId('5d4aae08f61692ad5f01294d'), new ObjectId('5d4ab4c9f61692ad5f01294e')],
       });
     });
   });
@@ -529,6 +529,7 @@ describe('AbstractModelInstance - MongoDB', () => {
         { $match: { a: '10' } },
         { $project: { a: 1, b: 1 } },
         { $sort: { a: 1, b: -1 } },
+        { $limit: 100 },
       ]);
       expect(conn.collection).toHaveBeenCalledWith('table1');
     });
@@ -568,7 +569,7 @@ describe('AbstractModelInstance - MongoDB', () => {
       Model.TABLE = 'table1';
 
       await expect(mongo.SELECT()).resolves.toEqual(expectation);
-      expect(mongo.query).toHaveBeenCalledWith('table1', undefined, undefined, undefined, undefined, 100);
+      expect(mongo.query).toHaveBeenCalledWith('table1', undefined, undefined, undefined, undefined, undefined);
     });
 
     it('should select all fields where it matches condition', async () => {
@@ -576,28 +577,28 @@ describe('AbstractModelInstance - MongoDB', () => {
       Model.TABLE = 'table2';
 
       await expect(mongo.SELECT(sampleCondition)).resolves.toEqual([expectation[1]]);
-      expect(mongo.query).toHaveBeenCalledWith('table2', sampleCondition, undefined, undefined, undefined, 100);
+      expect(mongo.query).toHaveBeenCalledWith('table2', sampleCondition, undefined, undefined, undefined, undefined);
     });
 
     it('should select some fields where it matches condition', async () => {
       mongo.query.mockResolvedValue([output[1]]);
       Model.TABLE = 'table3';
       await expect(mongo.SELECT(sampleCondition, sampleSelect1)).resolves.toEqual([expectation[1]]);
-      expect(mongo.query).toHaveBeenCalledWith('table3', sampleCondition, sampleSelect1, undefined, undefined, 100);
+      expect(mongo.query).toHaveBeenCalledWith('table3', sampleCondition, sampleSelect1, undefined, undefined, undefined);
     });
 
     it('should select some fields where it matches condition and order by multiple fields', async () => {
       mongo.query.mockResolvedValue([output[1]]);
       Model.TABLE = 'table4';
       await expect(mongo.SELECT(sampleCondition, sampleSelect2, sampleOrderby1)).resolves.toEqual([expectation[1]]);
-      expect(mongo.query).toHaveBeenCalledWith('table4', sampleCondition, sampleSelect2, sampleOrderby1, undefined, 100);
+      expect(mongo.query).toHaveBeenCalledWith('table4', sampleCondition, sampleSelect2, sampleOrderby1, undefined, undefined);
     });
 
     it('should select some fields where it matches condition and order by one field', async () => {
       mongo.query.mockResolvedValue([output[1]]);
       Model.TABLE = 'table5';
       await expect(mongo.SELECT(sampleCondition, sampleSelect2, sampleOrderby2)).resolves.toEqual([expectation[1]]);
-      expect(mongo.query).toHaveBeenCalledWith('table5', sampleCondition, sampleSelect2, sampleOrderby2, undefined, 100);
+      expect(mongo.query).toHaveBeenCalledWith('table5', sampleCondition, sampleSelect2, sampleOrderby2, undefined, undefined);
     });
 
     it('query throws exception', async () => {
@@ -839,7 +840,7 @@ describe('AbstractModelInstance - MongoDB', () => {
       Model.TABLE = 'table1';
       mongo.set('a', 10);
       await expect(mongo.UPDATE()).resolves.toEqual(true);
-      expect(conn.updateOne).toHaveBeenCalledWith({ _id: new ObjectID(object.id) }, { $set: { a: 10 } });
+      expect(conn.updateOne).toHaveBeenCalledWith({ _id: new ObjectId(object.id) }, { $set: { a: 10 } });
       expect(conn.collection).toHaveBeenCalledWith('table1');
     });
 
@@ -850,7 +851,7 @@ describe('AbstractModelInstance - MongoDB', () => {
       mongo.set('b', { $inc: { b: 11 } });
       mongo.set('jsonField.address.postcode', 222);
       await expect(mongo.UPDATE()).resolves.toEqual(true);
-      expect(conn.updateOne).toHaveBeenCalledWith({ _id: new ObjectID(object.id) }, {
+      expect(conn.updateOne).toHaveBeenCalledWith({ _id: new ObjectId(object.id) }, {
         $inc: { a: 1, b: 11 },
         $set: {
           'jsonField.address.postcode': 222,
@@ -864,7 +865,7 @@ describe('AbstractModelInstance - MongoDB', () => {
       Model.TABLE = 'table3';
       mongo.set('a', { $inc: { a: 1 } });
       await expect(mongo.UPDATE()).resolves.toEqual(true);
-      expect(conn.updateOne).toHaveBeenCalledWith({ _id: new ObjectID(object.id) }, {
+      expect(conn.updateOne).toHaveBeenCalledWith({ _id: new ObjectId(object.id) }, {
         $inc: { a: 1 },
       });
       expect(conn.collection).toHaveBeenCalledWith('table3');
@@ -891,7 +892,7 @@ describe('AbstractModelInstance - MongoDB', () => {
       conn.deleteOne.mockResolvedValue({ deleteCount: 1 });
       Model.TABLE = 'table1';
       await expect(mongo.DELETE()).resolves.toBe(true);
-      expect(conn.deleteOne).toHaveBeenCalledWith({ _id: new ObjectID(sampleCondition.id) });
+      expect(conn.deleteOne).toHaveBeenCalledWith({ _id: new ObjectId(sampleCondition.id) });
       expect(conn.collection).toHaveBeenCalledWith('table1');
     });
 
@@ -900,7 +901,7 @@ describe('AbstractModelInstance - MongoDB', () => {
       conn.deleteOne.mockRejectedValue(err);
       Model.TABLE = 'table2';
       await expect(mongo.DELETE()).rejects.toEqual(err);
-      expect(conn.deleteOne).toHaveBeenCalledWith({ _id: new ObjectID(sampleCondition.id) });
+      expect(conn.deleteOne).toHaveBeenCalledWith({ _id: new ObjectId(sampleCondition.id) });
       expect(conn.collection).toHaveBeenCalledWith('table2');
     });
 
@@ -928,7 +929,7 @@ describe('AbstractModelInstance - MongoDB', () => {
       it('should not modify serialised property', async () => {
         const input = {
           a: 10,
-          objectIdField: new ObjectID('5d7c67fd217ffe92f90b1b1b'),
+          objectIdField: new ObjectId('5d7c67fd217ffe92f90b1b1b'),
         };
         model = new Model(input);
         await model.serialise();
@@ -942,7 +943,7 @@ describe('AbstractModelInstance - MongoDB', () => {
         };
         const expectation = {
           a: 10,
-          objectIdField: new ObjectID('5d7c67fd217ffe92f90b1b1b'),
+          objectIdField: new ObjectId('5d7c67fd217ffe92f90b1b1b'),
         };
         model = new Model(input);
         await model.serialise();
@@ -1010,7 +1011,7 @@ describe('AbstractModelInstance - MongoDB', () => {
         };
         const input = {
           a: 10,
-          objectIdField: new ObjectID('5d7c67fd217ffe92f90b1b1b'),
+          objectIdField: new ObjectId('5d7c67fd217ffe92f90b1b1b'),
         };
         model = new Model(input);
         await model.deserialise();

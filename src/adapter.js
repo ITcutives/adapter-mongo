@@ -7,7 +7,7 @@ const loIsEmpty = require('lodash/isEmpty');
 const loReduce = require('lodash/reduce');
 const loClone = require('lodash/clone');
 const loGet = require('lodash/get');
-const { ObjectID } = require('mongodb');
+const { ObjectId } = require('mongodb');
 const AbstractAdapter = require('@itcutives/adapter-memory/src/abstract');
 const Link = require('./link');
 
@@ -103,9 +103,9 @@ class Adapter extends AbstractAdapter {
   processSerialised(field, value) {
     if (this.constructor.SERIALIZED[field] === 'objectId') {
       if (Array.isArray(value)) {
-        value = value.map((v) => new ObjectID(v));
+        value = value.map((v) => new ObjectId(v));
       } else {
-        value = new ObjectID(value);
+        value = new ObjectId(value);
       }
     }
     return { field, value };
@@ -118,7 +118,7 @@ class Adapter extends AbstractAdapter {
         // eslint-disable-next-line default-case
         switch (v) {
           case 'objectId':
-            value = new ObjectID(value);
+            value = new ObjectId(value);
             break;
           case 'jsonString':
             if (typeof value !== 'string') {
@@ -230,10 +230,10 @@ class Adapter extends AbstractAdapter {
 
   static convertKey(id) {
     if (Array.isArray(id)) {
-      id = id.map((i) => new ObjectID(i));
+      id = id.map((i) => new ObjectId(i));
     } else if (typeof id === 'string' && id.length === 24) {
       try {
-        id = new ObjectID(id);
+        id = new ObjectId(id);
       } catch (e) {
         Adapter.debug(`${id} is not valid objectId`);
       }
